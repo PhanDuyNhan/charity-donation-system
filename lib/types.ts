@@ -1,0 +1,213 @@
+// Type definitions dựa trên database schema
+
+export type VaiTroNguoiDung = "quan_tri_vien" | "dieu_hanh_vien" | "bien_tap_vien" | "nguoi_dung" | "tinh_nguyen_vien"
+
+export type TrangThaiNguoiDung = "hoat_dong" | "khong_hoat_dong" | "bi_khoa"
+
+export type TrangThaiDuAn = "ban_nhap" | "hoat_dong" | "hoan_thanh" | "huy_bo" | "tam_dung"
+
+export type MucDoUuTien = "thap" | "trung_binh" | "cao" | "khan_cap"
+
+export type PhuongThucThanhToan = "vnpay" | "momo" | "tien_ma_hoa" | "chuyen_khoan_ngan_hang" | "tien_mat"
+
+export type TrangThaiThanhToan = "cho_xu_ly" | "dang_xu_ly" | "hoan_thanh" | "that_bai" | "huy_bo" | "hoan_tien"
+
+export type TrangThaiSuKien = "sap_dien_ra" | "dang_dien_ra" | "da_ket_thuc" | "huy_bo"
+
+export type LoaiSuKien = "gay_quy" | "tinh_nguyen" | "tuyen_truyen" | "dao_tao" | "khac"
+
+export type ChuyenMucTinTuc = "tin_tuc" | "su_kien" | "cau_chuyen_thanh_cong" | "thong_bao"
+
+export type TrangThaiNoiDung = "ban_nhap" | "da_xuat_ban" | "luu_tru"
+
+export interface NguoiDung {
+  id: number
+  email: string
+  mat_khau_hash?: string
+  ten: string
+  ho: string
+  so_dien_thoai?: string
+  dia_chi?: string
+  ngay_sinh?: string
+  vai_tro: VaiTroNguoiDung
+  trang_thai: TrangThaiNguoiDung
+  email_da_xac_thuc: boolean
+  thoi_gian_xac_thuc_email?: string
+  token_ghi_nho?: string
+  ngay_tao: string
+  ngay_cap_nhat: string
+}
+
+export interface DanhMucDuAn {
+  id: number
+  ten: string
+  mo_ta?: string
+  bieu_tuong?: string
+  thu_tu_hien_thi: number
+  dang_hoat_dong: boolean
+  ngay_tao: string
+}
+
+export interface DuAn {
+  id: number
+  tieu_de: string
+  duong_dan: string
+  mo_ta: string
+  mo_ta_ngan?: string
+  ma_danh_muc: number
+  so_tien_muc_tieu: number
+  so_tien_hien_tai: number
+  ngay_bat_dau: string
+  ngay_ket_thuc: string
+  trang_thai: TrangThaiDuAn
+  dia_diem?: string
+  so_nguoi_thu_huong: number
+  anh_dai_dien?: string
+  thu_vien_anh?: any
+  muc_do_uu_tien: MucDoUuTien
+  nguoi_tao: number
+  nguoi_phe_duyet?: number
+  thoi_gian_phe_duyet?: string
+  ngay_tao: string
+  ngay_cap_nhat: string
+}
+
+export interface QuyenGop {
+  id: number
+  ma_nguoi_dung?: number
+  ma_du_an: number
+  so_tien: number
+  don_vi_tien_te: string
+  phuong_thuc_thanh_toan: PhuongThucThanhToan
+  trang_thai_thanh_toan: TrangThaiThanhToan
+  ma_giao_dich?: string
+  ma_giao_dich_ngoai?: string
+  la_quyen_gop_dinh_ky: boolean
+  tan_suat_quyen_gop?: string
+  ngay_thanh_toan_tiep_theo?: string
+  duong_dan_bien_lai?: string
+  ten_nguoi_quyen_gop?: string
+  email_nguoi_quyen_gop?: string
+  sdt_nguoi_quyen_gop?: string
+  la_quyen_gop_an_danh: boolean
+  loi_nhan?: string
+  phi_giao_dich: number
+  so_tien_thuc_nhan: number
+  ngay_tao: string
+  ngay_cap_nhat: string
+  ngay_hoan_thanh?: string
+}
+
+export interface SuKien {
+  id: number
+  tieu_de: string
+  duong_dan: string
+  mo_ta: string
+  mo_ta_ngan?: string
+  thoi_gian_bat_dau: string
+  thoi_gian_ket_thuc?: string
+  dia_diem: string
+  dia_chi_chi_tiet?: string
+  vi_do?: number
+  kinh_do?: number
+  so_nguoi_toi_da?: number
+  so_nguoi_hien_tai: number
+  han_dang_ky?: string
+  trang_thai: TrangThaiSuKien
+  loai_su_kien: LoaiSuKien
+  phi_tham_gia: number
+  anh_dai_dien?: string
+  thu_vien_anh?: any
+  nguoi_lien_he?: string
+  sdt_lien_he?: string
+  email_lien_he?: string
+  yeu_cau_tham_gia?: string
+  quyen_loi?: string
+  nguoi_tao: number
+  ngay_tao: string
+  ngay_cap_nhat: string
+}
+
+export interface TinTuc {
+  id: number
+  tieu_de: string
+  duong_dan: string
+  noi_dung: string
+  tom_tat?: string
+  chuyen_muc: ChuyenMucTinTuc
+  ma_tac_gia: number
+  trang_thai: TrangThaiNoiDung
+  anh_dai_dien?: string
+  thu_vien_anh?: any
+  the_tag?: any
+  luot_xem: number
+  la_bai_noi_bat: boolean
+  tieu_de_seo?: string
+  mo_ta_seo?: string
+  ngay_xuat_ban?: string
+  ngay_tao: string
+  ngay_cap_nhat: string
+}
+
+export interface TinhNguyenVien {
+  id: number
+  ma_nguoi_dung: number
+  ky_nang?: any
+  thoi_gian_ranh?: any
+  kinh_nghiem?: string
+  gioi_thieu?: string
+  trang_thai: string
+  diem_danh_gia: number
+  tong_gio_dong_gop: number
+  ngon_ngu?: any
+  trinh_do_hoc_van?: string
+  nghe_nghiep?: string
+  lien_he_khan_cap?: any
+  da_kiem_tra_ly_lich: boolean
+  ngay_kiem_tra_ly_lich?: string
+  ngay_tao: string
+  ngay_cap_nhat: string
+}
+
+export interface TinNhanLienHe {
+  id: number
+  ten_nguoi_gui: string
+  email: string
+  so_dien_thoai?: string
+  chu_de: string
+  noi_dung: string
+  danh_muc: string
+  muc_do_uu_tien: string
+  trang_thai_xu_ly: string
+  nguoi_phu_trach?: number
+  phan_hoi?: string
+  thoi_gian_phan_hoi?: string
+  dia_chi_ip?: string
+  thong_tin_trinh_duyet?: string
+  file_dinh_kem?: any
+  ngay_tao: string
+  ngay_cap_nhat: string
+}
+
+export interface BaoCaoTaiChinh {
+  id: number
+  loai_bao_cao: string
+  ngay_bat_dau_ky: string
+  ngay_ket_thuc_ky: string
+  ma_du_an?: number
+  tong_quyen_gop: number
+  tong_chi_phi: number
+  chi_phi_quan_ly: number
+  chi_phi_du_an: number
+  chi_phi_van_hanh: number
+  so_du_quy: number
+  duong_dan_file_bao_cao?: string
+  trang_thai: TrangThaiNoiDung
+  tom_tat?: string
+  ghi_chu?: string
+  nguoi_tao: number
+  nguoi_phe_duyet?: number
+  ngay_xuat_ban?: string
+  ngay_tao: string
+  ngay_cap_nhat: string
+}
