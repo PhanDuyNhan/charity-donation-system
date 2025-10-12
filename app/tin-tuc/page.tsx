@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Calendar, User, Search, ArrowRight } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
 import type { TinTuc } from "@/lib/types"
-
 export default function TinTucPage() {
   const [tinTuc, setTinTuc] = useState<TinTuc[]>([])
   const [loading, setLoading] = useState(true)

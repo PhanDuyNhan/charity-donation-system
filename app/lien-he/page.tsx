@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Mail, Phone, MapPin, Send } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-
+import Navbar from "@/components/Navbar"
 export default function LienHePage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)

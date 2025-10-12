@@ -1,3 +1,6 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -5,128 +8,49 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Heart, Search, Filter, MapPin, Calendar } from "lucide-react"
+import Navbar from "@/components/Navbar"
+import { apiClient } from "@/lib/api-client"
+
 
 export default function DuAnPage() {
-  const projects = [
-    {
-      id: 1,
-      ten: "Xây Dựng Trường Học Vùng Cao",
-      mo_ta: "Xây dựng trường học cho trẻ em vùng cao Lào Cai",
-      danh_muc: "Giáo dục",
-      dia_diem: "Lào Cai",
-      trang_thai: "dang_thuc_hien",
-      muc_tieu: 1000000000,
-      da_quyen_gop: 750000000,
-      ngay_bat_dau: "2025-01-01",
-      ngay_ket_thuc: "2025-06-30",
-    },
-    {
-      id: 2,
-      ten: "Hỗ Trợ Y Tế Miền Trung",
-      mo_ta: "Cung cấp thiết bị y tế cho bệnh viện vùng lũ",
-      danh_muc: "Y tế",
-      dia_diem: "Quảng Trị",
-      trang_thai: "dang_thuc_hien",
-      muc_tieu: 500000000,
-      da_quyen_gop: 320000000,
-      ngay_bat_dau: "2025-02-01",
-      ngay_ket_thuc: "2025-05-31",
-    },
-    {
-      id: 3,
-      ten: "Trồng Cây Xanh Đô Thị",
-      mo_ta: "Trồng 10,000 cây xanh tại các khu đô thị",
-      danh_muc: "Môi trường",
-      dia_diem: "Hà Nội",
-      trang_thai: "dang_thuc_hien",
-      muc_tieu: 300000000,
-      da_quyen_gop: 180000000,
-      ngay_bat_dau: "2025-03-01",
-      ngay_ket_thuc: "2025-12-31",
-    },
-    {
-      id: 4,
-      ten: "Hỗ Trợ Trẻ Em Mồ Côi",
-      mo_ta: "Cung cấp học bổng và hỗ trợ sinh hoạt cho trẻ em mồ côi",
-      danh_muc: "Trẻ em",
-      dia_diem: "TP. Hồ Chí Minh",
-      trang_thai: "dang_thuc_hien",
-      muc_tieu: 800000000,
-      da_quyen_gop: 560000000,
-      ngay_bat_dau: "2025-01-15",
-      ngay_ket_thuc: "2025-12-31",
-    },
-    {
-      id: 5,
-      ten: "Chăm Sóc Người Cao Tuổi",
-      mo_ta: "Xây dựng nhà dưỡng lão cho người cao tuổi neo đơn",
-      danh_muc: "Người cao tuổi",
-      dia_diem: "Đà Nẵng",
-      trang_thai: "dang_thuc_hien",
-      muc_tieu: 1500000000,
-      da_quyen_gop: 900000000,
-      ngay_bat_dau: "2025-02-15",
-      ngay_ket_thuc: "2025-08-31",
-    },
-    {
-      id: 6,
-      ten: "Nước Sạch Vùng Khó Khăn",
-      mo_ta: "Xây dựng hệ thống nước sạch cho vùng khó khăn",
-      danh_muc: "Cơ sở hạ tầng",
-      dia_diem: "Cao Bằng",
-      trang_thai: "dang_thuc_hien",
-      muc_tieu: 600000000,
-      da_quyen_gop: 420000000,
-      ngay_bat_dau: "2025-01-20",
-      ngay_ket_thuc: "2025-07-31",
-    },
-  ]
+  const [projects, setProjects] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  // ✅ Fetch dữ liệu thật từ API
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        // ✅ Gọi API backend: http://j2ee.oshi.id.vn:5555/api/v1/du_an?offset=0&limit=6
+        const data = await apiClient.getDuAn({ offset: 0, limit: 6 })
+        setProjects(data)
+      } catch (err: any) {
+  console.error("❌ Lỗi khi fetch dự án:", err)
+  setError(`Không thể tải danh sách dự án: ${err.message}`)
+}
+ finally {
+        setLoading(false)
+      }
+    }
+
+    loadProjects()
+  }, [])
+
+  // ✅ Hiển thị trạng thái tải
+  if (loading) return <div className="text-center py-20 text-gray-500">Đang tải dữ liệu...</div>
+  if (error) return <div className="text-center py-20 text-red-500">{error}</div>
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <Heart className="h-8 w-8 text-primary fill-primary" />
-            <span className="text-xl font-bold">Từ Thiện Việt</span>
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/du-an" className="text-sm font-medium text-primary">
-              Dự Án
-            </Link>
-            <Link href="/su-kien" className="text-sm font-medium hover:text-primary transition-colors">
-              Sự Kiện
-            </Link>
-            <Link href="/tin-tuc" className="text-sm font-medium hover:text-primary transition-colors">
-              Tin Tức
-            </Link>
-            <Link href="/lien-he" className="text-sm font-medium hover:text-primary transition-colors">
-              Liên Hệ
-            </Link>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <Link href="/dang-nhap">
-              <Button variant="ghost" size="sm">
-                Đăng Nhập
-              </Button>
-            </Link>
-            <Link href="/dang-ky">
-              <Button size="sm">Đăng Ký</Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-blue-50 to-green-50 py-12">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-balance">Các Dự Án Từ Thiện</h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto text-pretty leading-relaxed">
-              Khám phá và đóng góp cho các dự án từ thiện đang cần sự hỗ trợ của bạn
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Các Dự Án Từ Thiện</h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Khám phá và đóng góp cho các dự án đang cần sự hỗ trợ của bạn 💗
             </p>
           </div>
 
@@ -151,17 +75,6 @@ export default function DuAnPage() {
                   <SelectItem value="nguoi-cao-tuoi">Người cao tuổi</SelectItem>
                 </SelectContent>
               </Select>
-              <Select>
-                <SelectTrigger className="w-full md:w-[200px]">
-                  <SelectValue placeholder="Trạng thái" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="dang-thuc-hien">Đang thực hiện</SelectItem>
-                  <SelectItem value="sap-dien-ra">Sắp diễn ra</SelectItem>
-                  <SelectItem value="hoan-thanh">Hoàn thành</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
         </div>
@@ -172,45 +85,65 @@ export default function DuAnPage() {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => {
-              const progress = (project.da_quyen_gop / project.muc_tieu) * 100
+              const progress = (project.so_tien_hien_tai / project.so_tien_muc_tieu) * 100
 
               return (
-                <Card key={project.id} className="overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                <Card
+                  key={project.id}
+                  className="overflow-hidden hover:shadow-xl transition-shadow duration-300"
+                >
                   <div className="relative h-48 overflow-hidden">
                     <img
-                      src={`/charity-.jpg?height=200&width=400&query=charity ${project.danh_muc}`}
-                      alt={project.ten}
+                      src={
+                        project.anh_dai_dien?.startsWith("http")
+                          ? project.anh_dai_dien
+                          : `http://j2ee.oshi.id.vn:5555${project.anh_dai_dien}`
+                      }
+                      alt={project.tieu_de}
                       className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                     />
                     <Badge className="absolute top-4 right-4 bg-secondary text-white">
-                      {project.trang_thai === "dang_thuc_hien" ? "Đang thực hiện" : "Sắp diễn ra"}
+                      {project.trang_thai === "hoat_dong"
+                        ? "Đang hoạt động"
+                        : "Sắp diễn ra"}
                     </Badge>
                   </div>
 
                   <CardHeader>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                      <Badge variant="outline">{project.danh_muc}</Badge>
+                      <Badge variant="outline">
+                        {project.muc_do_uu_tien?.replace("_", " ")}
+                      </Badge>
                       <span className="flex items-center gap-1">
                         <MapPin className="h-3 w-3" />
                         {project.dia_diem}
                       </span>
                     </div>
-                    <CardTitle className="text-xl text-balance">{project.ten}</CardTitle>
-                    <CardDescription className="line-clamp-2">{project.mo_ta}</CardDescription>
+                    <CardTitle className="text-xl">{project.tieu_de}</CardTitle>
+                    <CardDescription className="line-clamp-2">{project.mo_ta_ngan}</CardDescription>
                   </CardHeader>
 
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Đã quyên góp</span>
-                        <span className="font-semibold text-primary">{progress.toFixed(0)}%</span>
+                        <span className="font-semibold text-primary">
+                          {progress.toFixed(0)}%
+                        </span>
                       </div>
                       <div className="w-full bg-secondary/20 rounded-full h-2">
-                        <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                        <div
+                          className="bg-primary h-2 rounded-full transition-all"
+                          style={{ width: `${progress}%` }}
+                        />
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="font-semibold">{project.da_quyen_gop.toLocaleString("vi-VN")} đ</span>
-                        <span className="text-muted-foreground">/ {project.muc_tieu.toLocaleString("vi-VN")} đ</span>
+                        <span className="font-semibold">
+                          {project.so_tien_hien_tai.toLocaleString("vi-VN")} đ
+                        </span>
+                        <span className="text-muted-foreground">
+                          / {project.so_tien_muc_tieu.toLocaleString("vi-VN")} đ
+                        </span>
                       </div>
                     </div>
 
@@ -230,88 +163,13 @@ export default function DuAnPage() {
               )
             })}
           </div>
-
-          {/* Pagination */}
-          <div className="flex justify-center mt-12">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled>
-                Trước
-              </Button>
-              <Button variant="default" size="sm">
-                1
-              </Button>
-              <Button variant="outline" size="sm">
-                2
-              </Button>
-              <Button variant="outline" size="sm">
-                3
-              </Button>
-              <Button variant="outline" size="sm">
-                Sau
-              </Button>
-            </div>
-          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-foreground text-white py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Heart className="h-6 w-6 fill-white" />
-                <span className="text-lg font-bold">Từ Thiện Việt</span>
-              </div>
-              <p className="text-white/70 text-sm leading-relaxed">
-                Nền tảng quyên góp từ thiện minh bạch và hiệu quả cho cộng đồng Việt Nam.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-4">Về Chúng Tôi</h3>
-              <ul className="space-y-2 text-sm text-white/70">
-                <li>
-                  <Link href="/gioi-thieu" className="hover:text-white transition-colors">
-                    Giới Thiệu
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/su-menh" className="hover:text-white transition-colors">
-                    Sứ Mệnh
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-4">Hỗ Trợ</h3>
-              <ul className="space-y-2 text-sm text-white/70">
-                <li>
-                  <Link href="/huong-dan" className="hover:text-white transition-colors">
-                    Hướng Dẫn
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/lien-he" className="hover:text-white transition-colors">
-                    Liên Hệ
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-4">Liên Hệ</h3>
-              <ul className="space-y-2 text-sm text-white/70">
-                <li>Email: contact@tuthienviet.org</li>
-                <li>Hotline: 1900 xxxx</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t border-white/10 pt-8 text-center text-sm text-white/70">
-            <p>&copy; 2025 Từ Thiện Việt. Tất cả quyền được bảo lưu.</p>
-          </div>
+      <footer className="bg-foreground text-white py-12 mt-12">
+        <div className="container mx-auto px-4 text-center text-sm text-white/70">
+          <p>&copy; 2025 Từ Thiện Việt. Tất cả quyền được bảo lưu.</p>
         </div>
       </footer>
     </div>

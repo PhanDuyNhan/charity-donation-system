@@ -1,6 +1,6 @@
 // API Configuration - Dễ dàng thay đổi host API
 export const API_CONFIG = {
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || "http://j2ee.oshi.id.vn:5555",
+  BASE_URL: process.env.NEXT_PUBLIC_API_URL || "",
   API_VERSION: "v1",
   ENDPOINTS: {
     // User endpoints
@@ -39,6 +39,8 @@ export const API_CONFIG = {
 
 // Helper function để tạo full URL
 export function getApiUrl(endpoint: string): string {
+  // Nếu BASE_URL trống → tự động gọi qua proxy nội bộ (/api)
+  if (!API_CONFIG.BASE_URL) return endpoint
   return `${API_CONFIG.BASE_URL}${endpoint}`
 }
 

@@ -5,6 +5,7 @@ import { persist } from "zustand/middleware"
 import type { NguoiDung } from "./types"
 import { apiClient } from "./api-client"
 
+// =================== COOKIE HELPERS ===================
 function setCookie(name: string, value: string, days = 7) {
   const expires = new Date()
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
@@ -15,6 +16,7 @@ function deleteCookie(name: string) {
   document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/`
 }
 
+// =================== AUTH STORE ===================
 interface AuthState {
   user: NguoiDung | null
   token: string | null
@@ -45,22 +47,20 @@ const useAuthStore = create<AuthState>()(
           user: state.user ? { ...state.user, ...userData } : null,
         })),
     }),
-    {
-      name: "auth-storage",
-    },
+    { name: "auth-storage" },
   ),
 )
 
-// Helper function để check quyền admin
+// =================== ROLE HELPERS ===================
 export function isAdmin(user: NguoiDung | null): boolean {
   return user?.vai_tro === "quan_tri_vien" || user?.vai_tro === "dieu_hanh_vien"
 }
 
-// Helper function để check quyền biên tập
 export function isEditor(user: NguoiDung | null): boolean {
   return user?.vai_tro === "bien_tap_vien" || isAdmin(user)
 }
 
+// =================== DEMO ACCOUNTS (giữ lại để test admin) ===================
 const DEMO_ACCOUNTS = {
   admin: {
     email: "admin@test.com",
@@ -68,114 +68,74 @@ const DEMO_ACCOUNTS = {
     user: {
       id: "demo-admin-1",
       email: "admin@test.com",
-      mat_khau_hash: btoa("password"),
       ho: "Admin",
       ten: "Demo",
+      vai_tro: "quan_tri_vien",
       so_dien_thoai: "0123456789",
       dia_chi: "Hà Nội",
-      ngay_sinh: "1990-01-01",
-      vai_tro: "quan_tri_vien",
       trang_thai: "hoat_dong",
       email_da_xac_thuc: true,
-      thoi_gian_xac_thuc_email: new Date().toISOString(),
-      token_ghi_nho: null,
-      ngay_tao: new Date().toISOString(),
-      ngay_cap_nhat: new Date().toISOString(),
-    } as NguoiDung,
-  },
-  user: {
-    email: "user@test.com",
-    password: "password",
-    user: {
-      id: "demo-user-1",
-      email: "user@test.com",
-      mat_khau_hash: btoa("password"),
-      ho: "User",
-      ten: "Demo",
-      so_dien_thoai: "0987654321",
-      dia_chi: "TP. Hồ Chí Minh",
-      ngay_sinh: "1995-05-15",
-      vai_tro: "nguoi_dung",
-      trang_thai: "hoat_dong",
-      email_da_xac_thuc: true,
-      thoi_gian_xac_thuc_email: new Date().toISOString(),
-      token_ghi_nho: null,
       ngay_tao: new Date().toISOString(),
       ngay_cap_nhat: new Date().toISOString(),
     } as NguoiDung,
   },
 }
 
+// =================== AUTH SERVICE ===================
 export const authService = {
-  async login(email: string, mat_khau: string) {
+  // ---- LOGIN ----
+  async login(email: string, password: string) {
     try {
-      const demoAccount = Object.values(DEMO_ACCOUNTS).find(
-        (account) => account.email === email && account.password === mat_khau,
-      )
+      const response: any = await apiClient.post("/api/v1/auth/login", { email, password })
 
-      if (demoAccount) {
-        const token = btoa(`${email}:${mat_khau}`)
-        useAuthStore.getState().login(demoAccount.user, token)
-        return { user: demoAccount.user, token }
+      const user = response?.data?.userInfo
+      const token = response?.data?.accessToken
+
+      if (!user || !token) {
+        throw new Error("Dữ liệu đăng nhập không hợp lệ")
       }
 
-      // Note: In production, password verification should be done server-side
-      const users = await apiClient.get<NguoiDung[]>("/nguoi_dung", {
-        email: `eq.${email}`,
-      })
-
-      if (users && users.length > 0) {
-        const user = users[0]
-
-        // For now, we'll assume the API handles authentication
-        // You should implement proper password hashing on the backend
-        const token = btoa(`${email}:${mat_khau}`) // Simple token encoding
-
-        // Lưu vào store
-        useAuthStore.getState().login(user, token)
-
-        return { user, token }
-      } else {
-        throw new Error("Email hoặc mật khẩu không đúng")
-      }
+      useAuthStore.getState().login(user, token)
+      return { user, token }
     } catch (error: any) {
+      console.warn("API login failed, thử DEMO admin...")
+
+      const demo = DEMO_ACCOUNTS.admin
+      if (email === demo.email && password === demo.password) {
+        const token = btoa(`${email}:${password}`)
+        useAuthStore.getState().login(demo.user, token)
+        return { user: demo.user, token }
+      }
+
       throw new Error(error.message || "Đăng nhập thất bại")
     }
-  },
+  }
+  ,
 
+  // ---- REGISTER ----
   async register(data: {
     ho: string
     ten: string
     email: string
     so_dien_thoai: string
-    mat_khau: string
+    password: string
   }) {
-    try {
-      const mat_khau_hash = btoa(data.mat_khau) // Simple encoding, use bcrypt in production
-
-      const newUser = await apiClient.post<NguoiDung>("/nguoi_dung", {
-        ho: data.ho,
-        ten: data.ten,
-        email: data.email,
-        so_dien_thoai: data.so_dien_thoai,
-        mat_khau_hash: mat_khau_hash,
-        vai_tro: "nguoi_dung",
-        trang_thai: "hoat_dong",
-        email_da_xac_thuc: false,
-        ngay_tao: new Date().toISOString(),
-        ngay_cap_nhat: new Date().toISOString(),
-      })
-
-      return newUser
-    } catch (error: any) {
-      throw new Error(error.message || "Đăng ký thất bại")
-    }
+    const response = await apiClient.post("/api/v1/auth/register", {
+      email: data.email,
+      password: data.password, // ✅
+      ten: data.ten,
+      ho: data.ho,
+      so_dien_thoai: data.so_dien_thoai,
+    })
+    return response
   },
 
+  // ---- LOGOUT ----
   logout() {
     useAuthStore.getState().logout()
   },
 
+  // ---- HELPERS ----
   getCurrentUser() {
     return useAuthStore.getState().user
   },

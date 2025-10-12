@@ -42,7 +42,7 @@ export default function AdminDuAnPage() {
     }
   }
 
-  const filteredDuAn = duAn.filter((d) => d.ten_du_an.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredDuAn = duAn.filter((d) => d.tieu_de.toLowerCase().includes(searchTerm.toLowerCase()))
 
   const getStatusBadge = (trangThai: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -100,7 +100,7 @@ export default function AdminDuAnPage() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-xl font-semibold">{d.ten_du_an}</h3>
+                    <h3 className="text-xl font-semibold">{d.tieu_de}</h3>
                     {getStatusBadge(d.trang_thai)}
                   </div>
                   <p className="text-muted-foreground mb-4 line-clamp-2">{d.mo_ta}</p>

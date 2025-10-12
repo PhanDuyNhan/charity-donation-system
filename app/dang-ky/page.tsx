@@ -42,8 +42,9 @@ export default function RegisterPage() {
         ten: formData.ten,
         email: formData.email,
         so_dien_thoai: formData.so_dien_thoai,
-        mat_khau: formData.mat_khau,
+        password: formData.mat_khau, // ✅ đổi key cho khớp với backend
       })
+
       router.push("/dang-nhap?registered=true")
     } catch (err: any) {
       setError(err.message || "Đăng ký thất bại")

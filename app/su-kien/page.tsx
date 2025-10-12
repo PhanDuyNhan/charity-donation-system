@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Heart, Calendar, MapPin, Users, Clock } from "lucide-react"
-
 export default function SuKienPage() {
   const events = [
     {
@@ -46,41 +45,6 @@ export default function SuKienPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <Heart className="h-8 w-8 text-primary fill-primary" />
-            <span className="text-xl font-bold">Từ Thiện Việt</span>
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/du-an" className="text-sm font-medium hover:text-primary transition-colors">
-              Dự Án
-            </Link>
-            <Link href="/su-kien" className="text-sm font-medium text-primary">
-              Sự Kiện
-            </Link>
-            <Link href="/tin-tuc" className="text-sm font-medium hover:text-primary transition-colors">
-              Tin Tức
-            </Link>
-            <Link href="/lien-he" className="text-sm font-medium hover:text-primary transition-colors">
-              Liên Hệ
-            </Link>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <Link href="/dang-nhap">
-              <Button variant="ghost" size="sm">
-                Đăng Nhập
-              </Button>
-            </Link>
-            <Link href="/dang-ky">
-              <Button size="sm">Đăng Ký</Button>
-            </Link>
-          </div>
-        </div>
-      </header>
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-pink-50 to-orange-50 py-12">
