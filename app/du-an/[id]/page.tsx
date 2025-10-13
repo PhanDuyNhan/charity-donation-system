@@ -42,45 +42,6 @@ export default async function DuAnChiTietPage({ params }: { params: { id: string
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <Heart className="h-8 w-8 text-orange-500 fill-orange-500" />
-            <span className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
-              Từ Thiện Việt
-            </span>
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/du-an" className="text-sm font-medium text-orange-500">
-              Dự Án
-            </Link>
-            <Link href="/su-kien" className="text-sm font-medium hover:text-orange-500 transition-colors">
-              Sự Kiện
-            </Link>
-            <Link href="/tin-tuc" className="text-sm font-medium hover:text-orange-500 transition-colors">
-              Tin Tức
-            </Link>
-            <Link href="/lien-he" className="text-sm font-medium hover:text-orange-500 transition-colors">
-              Liên Hệ
-            </Link>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <Link href="/dang-nhap">
-              <Button variant="ghost" size="sm">
-                Đăng Nhập
-              </Button>
-            </Link>
-            <Link href="/dang-ky">
-              <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
-                Đăng Ký
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
 
       {/* Back Button */}
       <div className="container mx-auto px-4 py-6">

@@ -123,13 +123,6 @@ export default function DangNhapPage() {
                 </Link>
               </div>
             </form>
-
-            {/* Demo credentials */}
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm font-semibold text-blue-900 mb-2">Demo Credentials:</p>
-              <p className="text-xs text-blue-700">Admin: admin@test.com / password</p>
-              <p className="text-xs text-blue-700">User: user@test.com / password</p>
-            </div>
           </CardContent>
         </Card>
 

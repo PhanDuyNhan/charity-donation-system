@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -15,22 +14,33 @@ import { authService } from "@/lib/auth"
 export default function RegisterPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
-    ho: "", // Changed from ho_ten to separate ho and ten
+    ho: "",
     ten: "",
     email: "",
     so_dien_thoai: "",
     mat_khau: "",
     xac_nhan_mat_khau: "",
   })
-  const [error, setError] = useState("")
+
+  const [fieldErrors, setFieldErrors] = useState({
+    email: "",
+    mat_khau: "",
+    xac_nhan_mat_khau: "",
+  })
+
+  const [generalError, setGeneralError] = useState("")
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
+    setGeneralError("")
+    setFieldErrors({ email: "", mat_khau: "", xac_nhan_mat_khau: "" })
 
     if (formData.mat_khau !== formData.xac_nhan_mat_khau) {
-      setError("Mật khẩu xác nhận không khớp")
+      setFieldErrors((prev) => ({
+        ...prev,
+        xac_nhan_mat_khau: "Mật khẩu xác nhận không khớp",
+      }))
       return
     }
 
@@ -42,12 +52,24 @@ export default function RegisterPage() {
         ten: formData.ten,
         email: formData.email,
         so_dien_thoai: formData.so_dien_thoai,
-        password: formData.mat_khau, // ✅ đổi key cho khớp với backend
+        password: formData.mat_khau,
       })
 
       router.push("/dang-nhap?registered=true")
     } catch (err: any) {
-      setError(err.message || "Đăng ký thất bại")
+      const rawMessage = err?.message || ""
+
+      if (
+        rawMessage.includes("duplicate key value") ||
+        rawMessage.includes("email") && rawMessage.includes("already exists")
+      ) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          email: "Email đã được sử dụng. Vui lòng dùng email khác.",
+        }))
+      } else {
+        setGeneralError("Đăng ký thất bại. Vui lòng thử lại.")
+      }
     } finally {
       setLoading(false)
     }
@@ -67,7 +89,11 @@ export default function RegisterPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
+            {generalError && (
+              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                {generalError}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -104,6 +130,9 @@ export default function RegisterPage() {
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
               />
+              {fieldErrors.email && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.email}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -128,6 +157,9 @@ export default function RegisterPage() {
                 onChange={(e) => setFormData({ ...formData, mat_khau: e.target.value })}
                 required
               />
+              {fieldErrors.mat_khau && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.mat_khau}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -140,6 +172,9 @@ export default function RegisterPage() {
                 onChange={(e) => setFormData({ ...formData, xac_nhan_mat_khau: e.target.value })}
                 required
               />
+              {fieldErrors.xac_nhan_mat_khau && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.xac_nhan_mat_khau}</p>
+              )}
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>

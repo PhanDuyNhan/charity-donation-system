@@ -4,9 +4,16 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Heart } from "lucide-react"
 import { useAuth } from "@/lib/auth"
+import { usePathname } from "next/navigation" // 👈 thêm dòng này
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth()
+  const pathname = usePathname() // 👈 lấy đường dẫn hiện tại
+
+  // 👇 Nếu đang ở trang admin thì không hiển thị navbar
+  if (pathname.startsWith("/admin")) {
+    return null
+  }
 
   const handleLogout = () => {
     logout()

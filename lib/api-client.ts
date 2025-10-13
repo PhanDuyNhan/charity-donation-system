@@ -1,16 +1,17 @@
-import { API_CONFIG,getApiUrl, buildQueryString } from "./api-config"
+import { API_CONFIG, getApiUrl, buildQueryString } from "./api-config"
 import type { NguoiDung, DuAn, SuKien, TinTuc, QuyenGop, TinhNguyenVien } from "./types"
 
-// Generic API client với error handling
 export class ApiClient {
+  // ==================== CORE REQUEST ====================
   private static async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = getApiUrl(endpoint)
- // 👇 Thêm dòng này ngay dưới đây để kiểm tra URL thực tế
-  console.log("✅ API BASE:", API_CONFIG.BASE_URL)
-  console.log("➡️ Fetching URL:", url)
 
-  // ✅ Thêm Bearer token tự động (nếu có trong localStorage)
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    // Debug log (giúp xác định URL thật)
+    console.log("✅ API BASE:", API_CONFIG.BASE_URL || "(proxy /api)")
+    console.log("➡️ Fetching URL:", url)
+
+    // ✅ Lấy Bearer token nếu có
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
 
     const defaultHeaders: Record<string, string> = {
       "Content-Type": "application/json",
@@ -21,19 +22,15 @@ export class ApiClient {
     try {
       const response = await fetch(url, {
         ...options,
-        headers: {
-          ...defaultHeaders,
-          ...(options.headers || {}),
-        },
+        headers: { ...defaultHeaders, ...(options.headers || {}) },
+        cache: "no-store",
       })
 
-      // ✅ Bắt lỗi HTTP rõ ràng
       if (!response.ok) {
         const errText = await response.text()
         throw new Error(`API Error: ${response.status} ${response.statusText} - ${errText}`)
       }
 
-      // ✅ Nếu không có nội dung (204 No Content)
       if (response.status === 204) return {} as T
 
       return await response.json()
@@ -45,20 +42,29 @@ export class ApiClient {
 
   // ==================== BASIC METHODS ====================
   static async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
-    const queryString = params ? `?${buildQueryString(params)}` : ""
-    return this.request<T>(`${endpoint}${queryString}`, { method: "GET" })
+    const query = params ? `?${buildQueryString(params)}` : ""
+    return this.request<T>(`${endpoint}${query}`, { method: "GET" })
   }
 
   static async post<T>(endpoint: string, data?: any): Promise<T> {
-    return this.request<T>(endpoint, { method: "POST", body: data ? JSON.stringify(data) : undefined })
+    return this.request<T>(endpoint, {
+      method: "POST",
+      body: data ? JSON.stringify(data) : undefined,
+    })
   }
 
   static async put<T>(endpoint: string, data?: any): Promise<T> {
-    return this.request<T>(endpoint, { method: "PUT", body: data ? JSON.stringify(data) : undefined })
+    return this.request<T>(endpoint, {
+      method: "PUT",
+      body: data ? JSON.stringify(data) : undefined,
+    })
   }
 
   static async patch<T>(endpoint: string, data?: any): Promise<T> {
-    return this.request<T>(endpoint, { method: "PATCH", body: data ? JSON.stringify(data) : undefined })
+    return this.request<T>(endpoint, {
+      method: "PATCH",
+      body: data ? JSON.stringify(data) : undefined,
+    })
   }
 
   static async delete<T>(endpoint: string): Promise<T> {
@@ -67,104 +73,104 @@ export class ApiClient {
 
   // ==================== NGƯỜI DÙNG ====================
   static async getNguoiDung(params?: Record<string, any>): Promise<NguoiDung[]> {
-    return this.get<NguoiDung[]>("/api/v1/nguoi_dung", params)
+    return this.get<NguoiDung[]>(API_CONFIG.ENDPOINTS.NGUOI_DUNG, params)
   }
 
   static async createNguoiDung(data: Partial<NguoiDung>): Promise<NguoiDung> {
-    return this.post<NguoiDung>("/api/v1/nguoi_dung", data)
+    return this.post<NguoiDung>(API_CONFIG.ENDPOINTS.NGUOI_DUNG, data)
   }
 
   static async updateNguoiDung(id: number, data: Partial<NguoiDung>): Promise<NguoiDung> {
-    return this.patch<NguoiDung>(`/api/v1/nguoi_dung/${id}`, data)
+    return this.put<NguoiDung>(`${API_CONFIG.ENDPOINTS.NGUOI_DUNG}/${id}`, data)
   }
 
   static async deleteNguoiDung(id: number): Promise<void> {
-    return this.delete<void>(`/api/v1/nguoi_dung/${id}`)
+    return this.delete<void>(`${API_CONFIG.ENDPOINTS.NGUOI_DUNG}/${id}`)
   }
 
   // ==================== DỰ ÁN ====================
   static async getDuAn(params?: Record<string, any>): Promise<DuAn[]> {
-    return this.get<DuAn[]>("/api/v1/du_an", params)
+    return this.get<DuAn[]>(API_CONFIG.ENDPOINTS.DU_AN, params)
   }
 
   static async createDuAn(data: Partial<DuAn>): Promise<DuAn> {
-    return this.post<DuAn>("/api/v1/du_an", data)
+    return this.post<DuAn>(API_CONFIG.ENDPOINTS.DU_AN, data)
   }
 
   static async updateDuAn(id: number, data: Partial<DuAn>): Promise<DuAn> {
-    return this.patch<DuAn>(`/api/v1/du_an/${id}`, data)
+    return this.put<DuAn>(`${API_CONFIG.ENDPOINTS.DU_AN}/${id}`, data)
   }
 
   static async deleteDuAn(id: number): Promise<void> {
-    return this.delete<void>(`/api/v1/du_an/${id}`)
+    return this.delete<void>(`${API_CONFIG.ENDPOINTS.DU_AN}/${id}`)
   }
 
   // ==================== SỰ KIỆN ====================
   static async getSuKien(params?: Record<string, any>): Promise<SuKien[]> {
-    return this.get<SuKien[]>("/api/v1/su_kien", params)
+    return this.get<SuKien[]>(API_CONFIG.ENDPOINTS.SU_KIEN, params)
   }
 
   static async createSuKien(data: Partial<SuKien>): Promise<SuKien> {
-    return this.post<SuKien>("/api/v1/su_kien", data)
+    return this.post<SuKien>(API_CONFIG.ENDPOINTS.SU_KIEN, data)
   }
 
   static async updateSuKien(id: number, data: Partial<SuKien>): Promise<SuKien> {
-    return this.patch<SuKien>(`/api/v1/su_kien/${id}`, data)
+    return this.put<SuKien>(`${API_CONFIG.ENDPOINTS.SU_KIEN}/${id}`, data)
   }
 
   static async deleteSuKien(id: number): Promise<void> {
-    return this.delete<void>(`/api/v1/su_kien/${id}`)
+    return this.delete<void>(`${API_CONFIG.ENDPOINTS.SU_KIEN}/${id}`)
   }
 
   // ==================== TIN TỨC ====================
   static async getTinTuc(params?: Record<string, any>): Promise<TinTuc[]> {
-    return this.get<TinTuc[]>("/api/v1/tin_tuc", params)
+    return this.get<TinTuc[]>(API_CONFIG.ENDPOINTS.TIN_TUC, params)
   }
 
   static async createTinTuc(data: Partial<TinTuc>): Promise<TinTuc> {
-    return this.post<TinTuc>("/api/v1/tin_tuc", data)
+    return this.post<TinTuc>(API_CONFIG.ENDPOINTS.TIN_TUC, data)
   }
 
   static async updateTinTuc(id: number, data: Partial<TinTuc>): Promise<TinTuc> {
-    return this.patch<TinTuc>(`/api/v1/tin_tuc/${id}`, data)
+    return this.put<TinTuc>(`${API_CONFIG.ENDPOINTS.TIN_TUC}/${id}`, data)
   }
 
   static async deleteTinTuc(id: number): Promise<void> {
-    return this.delete<void>(`/api/v1/tin_tuc/${id}`)
+    return this.delete<void>(`${API_CONFIG.ENDPOINTS.TIN_TUC}/${id}`)
   }
 
   // ==================== QUYÊN GÓP ====================
   static async getQuyenGop(params?: Record<string, any>): Promise<QuyenGop[]> {
-    return this.get<QuyenGop[]>("/api/v1/quyen_gop", params)
+    return this.get<QuyenGop[]>(API_CONFIG.ENDPOINTS.QUYEN_GOP, params)
   }
 
   static async createQuyenGop(data: Partial<QuyenGop>): Promise<QuyenGop> {
-    return this.post<QuyenGop>("/api/v1/quyen_gop", data)
+    return this.post<QuyenGop>(API_CONFIG.ENDPOINTS.QUYEN_GOP, data)
   }
 
   static async updateQuyenGop(id: number, data: Partial<QuyenGop>): Promise<QuyenGop> {
-    return this.patch<QuyenGop>(`/api/v1/quyen_gop/${id}`, data)
+    return this.put<QuyenGop>(`${API_CONFIG.ENDPOINTS.QUYEN_GOP}/${id}`, data)
   }
 
   static async deleteQuyenGop(id: number): Promise<void> {
-    return this.delete<void>(`/api/v1/quyen_gop/${id}`)
+    return this.delete<void>(`${API_CONFIG.ENDPOINTS.QUYEN_GOP}/${id}`)
   }
 
   // ==================== TÌNH NGUYỆN VIÊN ====================
   static async getTinhNguyenVien(params?: Record<string, any>): Promise<TinhNguyenVien[]> {
-    return this.get<TinhNguyenVien[]>("/api/v1/tinh_nguyen_vien", params)
+    return this.get<TinhNguyenVien[]>(API_CONFIG.ENDPOINTS.TINH_NGUYEN_VIEN, params)
   }
 
   static async createTinhNguyenVien(data: Partial<TinhNguyenVien>): Promise<TinhNguyenVien> {
-    return this.post<TinhNguyenVien>("/api/v1/tinh_nguyen_vien", data)
+    return this.post<TinhNguyenVien>(API_CONFIG.ENDPOINTS.TINH_NGUYEN_VIEN, data)
   }
 
   static async updateTinhNguyenVien(id: number, data: Partial<TinhNguyenVien>): Promise<TinhNguyenVien> {
-    return this.patch<TinhNguyenVien>(`/api/v1/tinh_nguyen_vien/${id}`, data)
+    return this.put<TinhNguyenVien>(`${API_CONFIG.ENDPOINTS.TINH_NGUYEN_VIEN}/${id}`, data)
   }
 
   static async deleteTinhNguyenVien(id: number): Promise<void> {
-    return this.delete<void>(`/api/v1/tinh_nguyen_vien/${id}`)
+    return this.delete<void>(`${API_CONFIG.ENDPOINTS.TINH_NGUYEN_VIEN}/${id}`)
   }
 }
 

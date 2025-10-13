@@ -60,27 +60,6 @@ export function isEditor(user: NguoiDung | null): boolean {
   return user?.vai_tro === "bien_tap_vien" || isAdmin(user)
 }
 
-// =================== DEMO ACCOUNTS (giữ lại để test admin) ===================
-const DEMO_ACCOUNTS = {
-  admin: {
-    email: "admin@test.com",
-    password: "password",
-    user: {
-      id: "demo-admin-1",
-      email: "admin@test.com",
-      ho: "Admin",
-      ten: "Demo",
-      vai_tro: "quan_tri_vien",
-      so_dien_thoai: "0123456789",
-      dia_chi: "Hà Nội",
-      trang_thai: "hoat_dong",
-      email_da_xac_thuc: true,
-      ngay_tao: new Date().toISOString(),
-      ngay_cap_nhat: new Date().toISOString(),
-    } as NguoiDung,
-  },
-}
-
 // =================== AUTH SERVICE ===================
 export const authService = {
   // ---- LOGIN ----
@@ -98,19 +77,10 @@ export const authService = {
       useAuthStore.getState().login(user, token)
       return { user, token }
     } catch (error: any) {
-      console.warn("API login failed, thử DEMO admin...")
-
-      const demo = DEMO_ACCOUNTS.admin
-      if (email === demo.email && password === demo.password) {
-        const token = btoa(`${email}:${password}`)
-        useAuthStore.getState().login(demo.user, token)
-        return { user: demo.user, token }
-      }
-
+      console.error("❌ Lỗi đăng nhập:", error)
       throw new Error(error.message || "Đăng nhập thất bại")
     }
-  }
-  ,
+  },
 
   // ---- REGISTER ----
   async register(data: {
@@ -122,7 +92,7 @@ export const authService = {
   }) {
     const response = await apiClient.post("/api/v1/auth/register", {
       email: data.email,
-      password: data.password, // ✅
+      password: data.password,
       ten: data.ten,
       ho: data.ho,
       so_dien_thoai: data.so_dien_thoai,

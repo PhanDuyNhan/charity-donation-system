@@ -21,22 +21,23 @@ export type ChuyenMucTinTuc = "tin_tuc" | "su_kien" | "cau_chuyen_thanh_cong" | 
 export type TrangThaiNoiDung = "ban_nhap" | "da_xuat_ban" | "luu_tru"
 
 export interface NguoiDung {
-  id: number
-  email: string
-  mat_khau_hash?: string
-  ten: string
-  ho: string
-  so_dien_thoai?: string
-  dia_chi?: string
-  ngay_sinh?: string
-  vai_tro: VaiTroNguoiDung
-  trang_thai: TrangThaiNguoiDung
-  email_da_xac_thuc: boolean
-  thoi_gian_xac_thuc_email?: string
-  token_ghi_nho?: string
-  ngay_tao: string
-  ngay_cap_nhat: string
+  id: number;
+  email: string;
+  mat_khau_hash?: string;
+  ten: string;
+  ho: string;
+  so_dien_thoai?: string | null;
+  dia_chi?: string | null;
+  ngay_sinh?: string | null;
+  vai_tro: "quan_tri_vien" | "bien_tap_vien" | "tinh_nguyen_vien" | "nguoi_dung" | "dieu_hanh_vien";
+  trang_thai?: "hoat_dong" | "bi_khoa" | string;
+  email_da_xac_thuc?: boolean;
+  thoi_gian_xac_thuc_email?: string | null;
+  token_ghi_nho?: string | null;
+  ngay_tao?: string;
+  ngay_cap_nhat?: string;
 }
+
 
 export interface DanhMucDuAn {
   id: number

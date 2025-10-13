@@ -22,7 +22,7 @@ export default function DuAnPage() {
     const loadProjects = async () => {
       try {
         // ✅ Gọi API backend: http://j2ee.oshi.id.vn:5555/api/v1/du_an?offset=0&limit=6
-        const data = await apiClient.getDuAn({ offset: 0, limit: 6 })
+        const data = await apiClient.getDuAn({ limit: 6, offset: 0 })
         setProjects(data)
       } catch (err: any) {
   console.error("❌ Lỗi khi fetch dự án:", err)
