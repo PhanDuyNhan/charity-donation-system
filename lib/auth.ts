@@ -4,6 +4,7 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { NguoiDung } from "./types"
 import { apiClient } from "./api-client"
+import { API_CONFIG } from "./api-config"
 
 // =================== COOKIE HELPERS ===================
 function setCookie(name: string, value: string, days = 7) {
@@ -35,11 +36,13 @@ const useAuthStore = create<AuthState>()(
       login: (user, token) => {
         setCookie("auth_token", token)
         setCookie("user_role", user.vai_tro || "nguoi_dung")
+        localStorage.setItem("token", token)
         set({ user, token, isAuthenticated: true })
       },
       logout: () => {
         deleteCookie("auth_token")
         deleteCookie("user_role")
+        localStorage.removeItem("token")
         set({ user: null, token: null, isAuthenticated: false })
       },
       updateUser: (userData) =>
@@ -65,7 +68,8 @@ export const authService = {
   // ---- LOGIN ----
   async login(email: string, password: string) {
     try {
-      const response: any = await apiClient.post("/api/v1/auth/login", { email, password })
+      // ⚙️ Gọi API đúng format BE (đã có BASE_URL trong api-client)
+      const response: any = await apiClient.post(API_CONFIG.ENDPOINTS.AUTH_LOGIN, { email, password })
 
       const user = response?.data?.userInfo
       const token = response?.data?.accessToken
@@ -90,14 +94,19 @@ export const authService = {
     so_dien_thoai: string
     password: string
   }) {
-    const response = await apiClient.post("/api/v1/auth/register", {
-      email: data.email,
-      password: data.password,
-      ten: data.ten,
-      ho: data.ho,
-      so_dien_thoai: data.so_dien_thoai,
-    })
-    return response
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.AUTH_REGISTER, {
+        email: data.email,
+        password: data.password,
+        ten: data.ten,
+        ho: data.ho,
+        so_dien_thoai: data.so_dien_thoai,
+      })
+      return response
+    } catch (error) {
+      console.error("❌ Lỗi đăng ký:", error)
+      throw error
+    }
   },
 
   // ---- LOGOUT ----

@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Edit, Trash2 } from "lucide-react"
+import { Search, Edit, Trash2, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { apiClient } from "@/lib/api-client"
 import type { NguoiDung } from "@/lib/types"
+import { formatShortDate } from "@/lib/utils"
 import { AddUserDialog } from "@/components/add-user-dialog"
 
 export default function AdminNguoiDungPage() {
@@ -24,7 +25,7 @@ export default function AdminNguoiDungPage() {
       const data = await apiClient.getNguoiDung()
       setNguoiDung(data)
     } catch (error) {
-      console.error("Lỗi tải người dùng:", error)
+      console.error("❌ Lỗi tải người dùng:", error)
     } finally {
       setLoading(false)
     }
@@ -35,10 +36,10 @@ export default function AdminNguoiDungPage() {
 
     try {
       await apiClient.deleteNguoiDung(id)
-      setNguoiDung(nguoiDung.filter((n) => n.id !== id))
+      setNguoiDung((prev) => prev.filter((n) => n.id !== id))
     } catch (error) {
-      console.error("Lỗi xóa người dùng:", error)
-      alert("Không thể xóa người dùng")
+      console.error("❌ Lỗi xóa người dùng:", error)
+      alert("Không thể xóa người dùng này!")
     }
   }
 
@@ -51,12 +52,14 @@ export default function AdminNguoiDungPage() {
   const getRoleBadge = (vaiTro: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       quan_tri_vien: "destructive",
-      bien_tap_vien: "default",
-      tinh_nguyen_vien: "secondary",
+      dieu_hanh_vien: "default",
+      bien_tap_vien: "secondary",
+      tinh_nguyen_vien: "outline",
       nguoi_dung: "outline",
     }
     const labels: Record<string, string> = {
       quan_tri_vien: "Quản trị viên",
+      dieu_hanh_vien: "Điều hành viên",
       bien_tap_vien: "Biên tập viên",
       tinh_nguyen_vien: "Tình nguyện viên",
       nguoi_dung: "Người dùng",
@@ -65,51 +68,40 @@ export default function AdminNguoiDungPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Đang tải...</div>
+    return <div className="flex items-center justify-center min-h-screen text-lg">Đang tải dữ liệu...</div>
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Quản lý Người dùng</h1>
-        <AddUserDialog onUserAdded={fetchNguoiDung} />
+        <AddUserDialog onUserAdded={fetchNguoiDung}>
+          <Button>
+            <UserPlus className="mr-2 h-4 w-4" /> Thêm người dùng
+          </Button>
+        </AddUserDialog>
       </div>
 
+      {/* Cards thống kê */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Tổng người dùng</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{nguoiDung.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Quản trị viên</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{nguoiDung.filter((n) => n.vai_tro === "quan_tri_vien").length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Biên tập viên</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{nguoiDung.filter((n) => n.vai_tro === "bien_tap_vien").length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Tình nguyện viên</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{nguoiDung.filter((n) => n.vai_tro === "tinh_nguyen_vien").length}</div>
-          </CardContent>
-        </Card>
+        {[
+          { title: "Tổng người dùng", value: nguoiDung.length },
+          { title: "Quản trị viên", value: nguoiDung.filter((n) => n.vai_tro === "quan_tri_vien").length },
+          { title: "Biên tập viên", value: nguoiDung.filter((n) => n.vai_tro === "bien_tap_vien").length },
+          { title: "Tình nguyện viên", value: nguoiDung.filter((n) => n.vai_tro === "tinh_nguyen_vien").length },
+        ].map((card, i) => (
+          <Card key={i}>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{card.value}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
+      {/* Tìm kiếm */}
       <Card>
         <CardHeader>
           <CardTitle>Tìm kiếm người dùng</CardTitle>
@@ -127,32 +119,41 @@ export default function AdminNguoiDungPage() {
         </CardContent>
       </Card>
 
+      {/* Bảng dữ liệu */}
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="border-b">
-                <tr className="text-left">
-                  <th className="p-4 font-medium">Họ tên</th>
-                  <th className="p-4 font-medium">Email</th>
-                  <th className="p-4 font-medium">Số điện thoại</th>
-                  <th className="p-4 font-medium">Vai trò</th>
-                  <th className="p-4 font-medium">Ngày tạo</th>
-                  <th className="p-4 font-medium">Thao tác</th>
+              <thead className="border-b bg-gray-50">
+                <tr className="text-left text-sm font-semibold">
+                  <th className="p-4">Họ tên</th>
+                  <th className="p-4">Email</th>
+                  <th className="p-4">SĐT</th>
+                  <th className="p-4">Vai trò</th>
+                  <th className="p-4">Trạng thái</th>
+                  <th className="p-4">Ngày tạo</th>
+                  <th className="p-4 text-center">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredNguoiDung.map((n) => (
-                  <tr key={n.id} className="border-b">
+                  <tr key={n.id} className="border-b hover:bg-gray-50">
                     <td className="p-4 font-medium">{`${n.ho} ${n.ten}`}</td>
-                    <td className="p-4">{n.email}</td>
-                    <td className="p-4">{n.so_dien_thoai}</td>
+                    <td className="p-4">{n.email || "-"}</td>
+                    <td className="p-4">{n.so_dien_thoai || "-"}</td>
                     <td className="p-4">{getRoleBadge(n.vai_tro)}</td>
-                    <td className="p-4 text-sm text-muted-foreground">
-                      {n.ngay_tao ? new Date(n.ngay_tao).toLocaleDateString("vi-VN") : ""}
-                    </td>
                     <td className="p-4">
-                      <div className="flex gap-2">
+                      {n.trang_thai === "hoat_dong" ? (
+                        <Badge variant="secondary">Hoạt động</Badge>
+                      ) : (
+                        <Badge variant="destructive">Bị khóa</Badge>
+                      )}
+                    </td>
+                    <td className="p-4 text-sm text-muted-foreground">
+                      {n.ngay_tao ? formatShortDate(n.ngay_tao) : "-"}
+                    </td>
+                    <td className="p-4 text-center">
+                      <div className="flex gap-2 justify-center">
                         <Button variant="outline" size="icon">
                           <Edit className="h-4 w-4" />
                         </Button>

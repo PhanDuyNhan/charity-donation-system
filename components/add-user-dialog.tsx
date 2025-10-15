@@ -18,7 +18,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiClient } from "@/lib/api-client"
 import { UserPlus } from "lucide-react"
 
-export function AddUserDialog({ onUserAdded }: { onUserAdded?: () => void }) {
+export function AddUserDialog({
+  children,
+  onUserAdded,
+}: {
+  children?: React.ReactNode
+  onUserAdded?: () => void
+}) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -73,11 +79,13 @@ export function AddUserDialog({ onUserAdded }: { onUserAdded?: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Thêm người dùng
-        </Button>
-      </DialogTrigger>
+  {children || (
+    <Button>
+      <UserPlus className="mr-2 h-4 w-4" />
+      Thêm người dùng
+    </Button>
+  )}
+</DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Thêm người dùng mới</DialogTitle>

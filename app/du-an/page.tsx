@@ -19,22 +19,23 @@ export default function DuAnPage() {
 
   // ✅ Fetch dữ liệu thật từ API
   useEffect(() => {
-    const loadProjects = async () => {
-      try {
-        // ✅ Gọi API backend: http://j2ee.oshi.id.vn:5555/api/v1/du_an?offset=0&limit=6
-        const data = await apiClient.getDuAn({ limit: 6, offset: 0 })
-        setProjects(data)
-      } catch (err: any) {
-  console.error("❌ Lỗi khi fetch dự án:", err)
-  setError(`Không thể tải danh sách dự án: ${err.message}`)
-}
- finally {
-        setLoading(false)
-      }
+  const loadProjects = async () => {
+    try {
+      console.log("🔹 Đang fetch danh sách dự án...")
+      const response = await apiClient.getDuAn({})
+      console.log("✅ Kết quả API:", response)
+      setProjects(response)
+    } catch (err: any) {
+      console.error("❌ Lỗi khi fetch dự án:", err)
+      setError("Không thể tải danh sách dự án. Vui lòng thử lại sau.")
+    } finally {
+      setLoading(false)
     }
+  }
 
-    loadProjects()
-  }, [])
+  loadProjects()
+}, [])
+
 
   // ✅ Hiển thị trạng thái tải
   if (loading) return <div className="text-center py-20 text-gray-500">Đang tải dữ liệu...</div>

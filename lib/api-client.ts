@@ -6,11 +6,11 @@ export class ApiClient {
   private static async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = getApiUrl(endpoint)
 
-    // Debug log (giúp xác định URL thật)
-    console.log("✅ API BASE:", API_CONFIG.BASE_URL || "(proxy /api)")
+    // Debug log
+    console.log("🌐 API BASE:", API_CONFIG.BASE_URL)
     console.log("➡️ Fetching URL:", url)
 
-    // ✅ Lấy Bearer token nếu có
+    // Lấy Bearer token (nếu có)
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
 
     const defaultHeaders: Record<string, string> = {
@@ -20,22 +20,25 @@ export class ApiClient {
     }
 
     try {
+      console.log("🔑 Token:", token);
       const response = await fetch(url, {
         ...options,
+        mode: "cors",              // ✅ Cho phép gọi từ FE khác domain
+        credentials: "include",    // ✅ Gửi cookie/session theo allowCredentials(true)
         headers: { ...defaultHeaders, ...(options.headers || {}) },
         cache: "no-store",
       })
 
       if (!response.ok) {
         const errText = await response.text()
+        console.error("❌ API Error:", response.status, errText)
         throw new Error(`API Error: ${response.status} ${response.statusText} - ${errText}`)
       }
 
       if (response.status === 204) return {} as T
-
       return await response.json()
     } catch (error) {
-      console.error("❌ API Request failed:", error)
+      console.error("🚨 Fetch failed:", error)
       throw error
     }
   }
@@ -69,6 +72,17 @@ export class ApiClient {
 
   static async delete<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, { method: "DELETE" })
+  }
+
+  // ==================== AUTH ====================
+  static async login(email: string, password: string): Promise<any> {
+    // 🔥 Endpoint: /api/v1/auth/login
+    return this.post(API_CONFIG.ENDPOINTS.AUTH_LOGIN, { email, password })
+  }
+
+  static async register(data: any): Promise<any> {
+    // 🔥 Endpoint: /api/v1/auth/register
+    return this.post(API_CONFIG.ENDPOINTS.AUTH_REGISTER, data)
   }
 
   // ==================== NGƯỜI DÙNG ====================

@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useAuth, isAdmin } from "@/lib/auth"
@@ -21,21 +20,34 @@ import {
   X,
   Heart,
 } from "lucide-react"
-import { useState } from "react"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const { user, logout } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isChecking, setIsChecking] = useState(true) // ✅ chờ load Zustand
 
+  // Kiểm tra quyền admin
   useEffect(() => {
-    if (!user || !isAdmin(user)) {
-      router.push("/dang-nhap")
-    }
+    const timer = setTimeout(() => {
+      if (!user) {
+        router.push("/dang-nhap")
+      } else if (!isAdmin(user)) {
+        router.push("/")
+      } else {
+        setIsChecking(false)
+      }
+    }, 100)
+    return () => clearTimeout(timer)
   }, [user, router])
 
-  if (!user || !isAdmin(user)) {
-    return null
+  // Hiển thị màn hình chờ trong khi kiểm tra đăng nhập
+  if (isChecking) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 text-gray-600 text-sm">
+        Đang tải dữ liệu người dùng...
+      </div>
+    )
   }
 
   const handleLogout = () => {
@@ -56,10 +68,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ]
 
   return (
-    <div className="admin-layout min-h-screen">
+    <div className="admin-layout min-h-screen bg-(--color-admin-bg)">
       {/* Sidebar */}
       <aside
-        className={`admin-sidebar fixed left-0 top-0 z-40 h-screen w-64 border-r transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
+        className={`admin-sidebar fixed left-0 top-0 z-40 h-screen w-64 border-r transition-transform bg-(--color-admin-sidebar) ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
@@ -85,7 +97,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-(--color-admin-text-secondary) hover:bg-(--color-admin-bg) hover:text-(--color-admin-text) transition-colors"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-(--color-admin-text-secondary) hover:bg-(--color-admin-bg-hover) hover:text-(--color-admin-text) transition-colors"
                     onClick={() => setSidebarOpen(false)}
                   >
                     <item.icon className="h-5 w-5" />
@@ -100,22 +112,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="border-t border-(--color-admin-border) p-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-(--color-primary) text-white font-semibold">
-                {user.ho.charAt(0)}
-                {user.ten.charAt(0)}
+                {user?.ho?.charAt(0)}
+                {user?.ten?.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-(--color-admin-text) truncate">
-                  {user.ho} {user.ten}
+                  {user?.ho} {user?.ten}
                 </p>
                 <p className="text-xs text-(--color-admin-text-secondary) truncate">
-                  {user.vai_tro === "quan_tri_vien" ? "Quản trị viên" : "Điều hành viên"}
+                  {user?.vai_tro === "quan_tri_vien" ? "Quản trị viên" : "Điều hành viên"}
                 </p>
               </div>
             </div>
             <Button
               variant="outline"
               size="sm"
-              className="w-full border-(--color-admin-border) text-(--color-admin-text-secondary) hover:bg-(--color-admin-bg) bg-transparent"
+              className="w-full border-(--color-admin-border) text-(--color-admin-text-secondary) hover:bg-(--color-admin-bg-hover) bg-transparent"
               onClick={handleLogout}
             >
               <LogOut className="h-4 w-4 mr-2" />
