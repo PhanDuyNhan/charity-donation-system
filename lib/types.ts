@@ -4,9 +4,9 @@ export type VaiTroNguoiDung = "quan_tri_vien" | "dieu_hanh_vien" | "bien_tap_vie
 
 export type TrangThaiNguoiDung = "hoat_dong" | "khong_hoat_dong" | "bi_khoa"
 
-export type TrangThaiDuAn = "ban_nhap" | "hoat_dong" | "hoan_thanh" | "huy_bo" | "tam_dung"
+export type TrangThaiDuAn = "hoat_dong" | "tam_dung" | "ban_nhap" | "hoan_thanh"
 
-export type MucDoUuTien = "thap" | "trung_binh" | "cao" | "khan_cap"
+export type MucDoUuTien = "khan_cap" | "cao" | "trung_binh" | "thap"
 
 export type PhuongThucThanhToan = "vnpay" | "momo" | "tien_ma_hoa" | "chuyen_khoan_ngan_hang" | "tien_mat"
 
@@ -19,6 +19,7 @@ export type LoaiSuKien = "gay_quy" | "tinh_nguyen" | "tuyen_truyen" | "dao_tao" 
 export type ChuyenMucTinTuc = "tin_tuc" | "su_kien" | "cau_chuyen_thanh_cong" | "thong_bao"
 
 export type TrangThaiNoiDung = "ban_nhap" | "da_xuat_ban" | "luu_tru"
+
 
 export interface NguoiDung {
   id: number;
@@ -60,17 +61,17 @@ export interface DuAn {
   so_tien_hien_tai: number
   ngay_bat_dau: string
   ngay_ket_thuc: string
-  trang_thai: TrangThaiDuAn
+  trang_thai?: TrangThaiDuAn
   dia_diem?: string
-  so_nguoi_thu_huong: number
+  so_nguoi_thu_huong?: number
   anh_dai_dien?: string
-  thu_vien_anh?: any
-  muc_do_uu_tien: MucDoUuTien
+  thu_vien_anh?: string | null
+  muc_do_uu_tien?: MucDoUuTien
   nguoi_tao: number
-  nguoi_phe_duyet?: number
-  thoi_gian_phe_duyet?: string
-  ngay_tao: string
-  ngay_cap_nhat: string
+  nguoi_phe_duyet?: number | null
+  thoi_gian_phe_duyet?: string | null
+  ngay_tao?: string
+  ngay_cap_nhat?: string
 }
 
 export interface QuyenGop {

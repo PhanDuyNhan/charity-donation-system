@@ -20,14 +20,45 @@ export class ApiClient {
     }
 
     try {
-      console.log("🔑 Token:", token);
+      console.log("🔑 Token:", token)
       const response = await fetch(url, {
         ...options,
-        mode: "cors",              // ✅ Cho phép gọi từ FE khác domain
-        credentials: "include",    // ✅ Gửi cookie/session theo allowCredentials(true)
+        mode: "cors",
+        credentials: "include",
         headers: { ...defaultHeaders, ...(options.headers || {}) },
         cache: "no-store",
       })
+
+      // Nếu unauthorized -> xử lý logout / redirect (token hết hạn hoặc không hợp lệ)
+      if (response.status === 401) {
+        let errText = ""
+        try {
+          errText = await response.text()
+        } catch (e) {
+          errText = ""
+        }
+        console.error("❌ API Error:", response.status, errText)
+
+        // Xoá token / refresh token khỏi localStorage (nếu có)
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("token")
+            localStorage.removeItem("refresh_token")
+          }
+        } catch (e) {
+          /* ignore */
+        }
+
+        // Điều hướng về trang login (tham số expired để UI hiển thị thông báo)
+        if (typeof window !== "undefined") {
+          // nếu đang ở trang login thì không redirect vòng lặp
+          if (!window.location.pathname.startsWith("/login")) {
+            window.location.href = "/login?expired=1"
+          }
+        }
+
+        throw new Error(`API Error: 401 Unauthorized - ${errText}`)
+      }
 
       if (!response.ok) {
         const errText = await response.text()
@@ -76,12 +107,10 @@ export class ApiClient {
 
   // ==================== AUTH ====================
   static async login(email: string, password: string): Promise<any> {
-    // 🔥 Endpoint: /api/v1/auth/login
     return this.post(API_CONFIG.ENDPOINTS.AUTH_LOGIN, { email, password })
   }
 
   static async register(data: any): Promise<any> {
-    // 🔥 Endpoint: /api/v1/auth/register
     return this.post(API_CONFIG.ENDPOINTS.AUTH_REGISTER, data)
   }
 
