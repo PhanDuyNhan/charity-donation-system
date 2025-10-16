@@ -1,16 +1,44 @@
+// lib/api-client.ts
 import { API_CONFIG, getApiUrl, buildQueryString } from "./api-config"
-import type { NguoiDung, DuAn, SuKien, TinTuc, QuyenGop, TinhNguyenVien } from "./types"
+import type {
+  NguoiDung,
+  DuAn,
+  SuKien,
+  TinTuc,
+  QuyenGop,
+  TinhNguyenVien,
+  DanhMucDuAn,
+  UploadResponse,
+} from "./types"
+
+/**
+ * ApiClient - wrapper nhỏ cho fetch với:
+ * - xử lý Authorization (localStorage token)
+ * - xử lý lỗi 401 (xoá token + redirect login)
+ * - helper GET/POST/PUT/PATCH/DELETE
+ * - helper uploadFile và getDanhMucDuAn
+ *
+ * Lưu ý: nếu API_CONFIG.ENDPOINTS không khai báo tất cả keys,
+ * hàm getEndpoint sẽ fallback về chuỗi mặc định.
+ */
+
+function getEndpoint(key: string, fallback: string) {
+  // cast sang any để tránh lỗi TS nếu ENDPOINTS không có key
+  const endpoints = (API_CONFIG as any)?.ENDPOINTS ?? {}
+  return endpoints[key] ?? fallback
+}
 
 export class ApiClient {
   // ==================== CORE REQUEST ====================
   private static async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = getApiUrl(endpoint)
 
-    // Debug log
-    console.log("🌐 API BASE:", API_CONFIG.BASE_URL)
+    // debug
+    if (typeof window !== "undefined") {
+      console.log("🌐 API BASE:", (API_CONFIG as any)?.BASE_URL ?? API_CONFIG.BASE_URL)
+    }
     console.log("➡️ Fetching URL:", url)
 
-    // Lấy Bearer token (nếu có)
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
 
     const defaultHeaders: Record<string, string> = {
@@ -29,30 +57,26 @@ export class ApiClient {
         cache: "no-store",
       })
 
-      // Nếu unauthorized -> xử lý logout / redirect (token hết hạn hoặc không hợp lệ)
+      // 401 -> clear token and redirect to login
       if (response.status === 401) {
         let errText = ""
         try {
           errText = await response.text()
-        } catch (e) {
+        } catch {
           errText = ""
         }
         console.error("❌ API Error:", response.status, errText)
 
-        // Xoá token / refresh token khỏi localStorage (nếu có)
         try {
           if (typeof window !== "undefined") {
             localStorage.removeItem("token")
             localStorage.removeItem("refresh_token")
           }
-        } catch (e) {
-          /* ignore */
-        }
+        } catch { }
 
-        // Điều hướng về trang login (tham số expired để UI hiển thị thông báo)
         if (typeof window !== "undefined") {
-          // nếu đang ở trang login thì không redirect vòng lặp
           if (!window.location.pathname.startsWith("/login")) {
+            // add a query flag so UI can show expired message
             window.location.href = "/login?expired=1"
           }
         }
@@ -67,7 +91,7 @@ export class ApiClient {
       }
 
       if (response.status === 204) return {} as T
-      return await response.json()
+      return (await response.json()) as T
     } catch (error) {
       console.error("🚨 Fetch failed:", error)
       throw error
@@ -107,113 +131,176 @@ export class ApiClient {
 
   // ==================== AUTH ====================
   static async login(email: string, password: string): Promise<any> {
-    return this.post(API_CONFIG.ENDPOINTS.AUTH_LOGIN, { email, password })
+    const ep = getEndpoint("AUTH_LOGIN", "auth/login")
+    return this.post(ep, { email, password })
   }
 
   static async register(data: any): Promise<any> {
-    return this.post(API_CONFIG.ENDPOINTS.AUTH_REGISTER, data)
+    const ep = getEndpoint("AUTH_REGISTER", "auth/register")
+    return this.post(ep, data)
   }
 
   // ==================== NGƯỜI DÙNG ====================
   static async getNguoiDung(params?: Record<string, any>): Promise<NguoiDung[]> {
-    return this.get<NguoiDung[]>(API_CONFIG.ENDPOINTS.NGUOI_DUNG, params)
+    const ep = getEndpoint("NGUOI_DUNG", "nguoi_dung")
+    return this.get<NguoiDung[]>(ep, params)
   }
 
   static async createNguoiDung(data: Partial<NguoiDung>): Promise<NguoiDung> {
-    return this.post<NguoiDung>(API_CONFIG.ENDPOINTS.NGUOI_DUNG, data)
+    const ep = getEndpoint("NGUOI_DUNG", "nguoi_dung")
+    return this.post<NguoiDung>(ep, data)
   }
 
   static async updateNguoiDung(id: number, data: Partial<NguoiDung>): Promise<NguoiDung> {
-    return this.put<NguoiDung>(`${API_CONFIG.ENDPOINTS.NGUOI_DUNG}/${id}`, data)
+    const ep = getEndpoint("NGUOI_DUNG", "nguoi_dung")
+    console.log("🧩 Updating user:", `${ep}?id=eq.${id}`, data)
+    return this.patch<NguoiDung>(`${ep}?id=eq.${id}`, data)
   }
 
   static async deleteNguoiDung(id: number): Promise<void> {
-    return this.delete<void>(`${API_CONFIG.ENDPOINTS.NGUOI_DUNG}/${id}`)
+    const ep = getEndpoint("NGUOI_DUNG", "nguoi_dung")
+    return this.delete<void>(`${ep}?id=eq.${id}`)
   }
+
 
   // ==================== DỰ ÁN ====================
   static async getDuAn(params?: Record<string, any>): Promise<DuAn[]> {
-    return this.get<DuAn[]>(API_CONFIG.ENDPOINTS.DU_AN, params)
+    const ep = getEndpoint("DU_AN", "du_an")
+    return this.get<DuAn[]>(ep, params)
   }
 
   static async createDuAn(data: Partial<DuAn>): Promise<DuAn> {
-    return this.post<DuAn>(API_CONFIG.ENDPOINTS.DU_AN, data)
+    const ep = getEndpoint("DU_AN", "du_an")
+    return this.post<DuAn>(ep, data)
   }
 
   static async updateDuAn(id: number, data: Partial<DuAn>): Promise<DuAn> {
-    return this.put<DuAn>(`${API_CONFIG.ENDPOINTS.DU_AN}/${id}`, data)
+    const ep = getEndpoint("DU_AN", "du_an")
+    return this.patch<DuAn>(`${ep}?id=eq.${id}`, data)
+    console.log("🧩 Updating project:", `${ep}?id=eq.${id}`, data)
   }
 
   static async deleteDuAn(id: number): Promise<void> {
-    return this.delete<void>(`${API_CONFIG.ENDPOINTS.DU_AN}/${id}`)
+    const ep = getEndpoint("DU_AN", "du_an")
+    return this.delete<void>(`${ep}?id=eq.${id}`)
+  }
+
+
+  // ==================== DANH MỤC DỰ ÁN ====================
+  static async getDanhMucDuAn(params?: Record<string, any>): Promise<DanhMucDuAn[]> {
+    const ep = getEndpoint("DANH_MUC_DU_AN", "danh_muc_du_an")
+    return this.get<DanhMucDuAn[]>(ep, params)
+  }
+
+  // ==================== FILE UPLOAD ====================
+  // upload multipart/form-data; backend should return JSON like { path: "/images/.."} or { url: "..." }
+  static async uploadFile(file: File): Promise<UploadResponse> {
+    const ep = getEndpoint("UPLOAD", "upload")
+    const url = getApiUrl(ep)
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+
+    const fd = new FormData()
+    fd.append("file", file)
+
+    const resp = await fetch(url, {
+      method: "POST",
+      body: fd,
+      mode: "cors",
+      credentials: "include",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+
+    if (!resp.ok) {
+      const errText = await resp.text()
+      console.error("❌ Upload failed:", resp.status, errText)
+      throw new Error(`Upload failed: ${resp.status} ${resp.statusText} - ${errText}`)
+    }
+
+    return (await resp.json()) as UploadResponse
   }
 
   // ==================== SỰ KIỆN ====================
   static async getSuKien(params?: Record<string, any>): Promise<SuKien[]> {
-    return this.get<SuKien[]>(API_CONFIG.ENDPOINTS.SU_KIEN, params)
+    const ep = getEndpoint("SU_KIEN", "su_kien")
+    return this.get<SuKien[]>(ep, params)
   }
 
   static async createSuKien(data: Partial<SuKien>): Promise<SuKien> {
-    return this.post<SuKien>(API_CONFIG.ENDPOINTS.SU_KIEN, data)
+    const ep = getEndpoint("SU_KIEN", "su_kien")
+    return this.post<SuKien>(ep, data)
   }
 
   static async updateSuKien(id: number, data: Partial<SuKien>): Promise<SuKien> {
-    return this.put<SuKien>(`${API_CONFIG.ENDPOINTS.SU_KIEN}/${id}`, data)
+    const ep = getEndpoint("SU_KIEN", "su_kien")
+    return this.put<SuKien>(`${ep}/${id}`, data)
   }
 
   static async deleteSuKien(id: number): Promise<void> {
-    return this.delete<void>(`${API_CONFIG.ENDPOINTS.SU_KIEN}/${id}`)
+    const ep = getEndpoint("SU_KIEN", "su_kien")
+    return this.delete<void>(`${ep}/${id}`)
   }
 
   // ==================== TIN TỨC ====================
   static async getTinTuc(params?: Record<string, any>): Promise<TinTuc[]> {
-    return this.get<TinTuc[]>(API_CONFIG.ENDPOINTS.TIN_TUC, params)
+    const ep = getEndpoint("TIN_TUC", "tin_tuc")
+    return this.get<TinTuc[]>(ep, params)
   }
 
   static async createTinTuc(data: Partial<TinTuc>): Promise<TinTuc> {
-    return this.post<TinTuc>(API_CONFIG.ENDPOINTS.TIN_TUC, data)
+    const ep = getEndpoint("TIN_TUC", "tin_tuc")
+    return this.post<TinTuc>(ep, data)
   }
 
   static async updateTinTuc(id: number, data: Partial<TinTuc>): Promise<TinTuc> {
-    return this.put<TinTuc>(`${API_CONFIG.ENDPOINTS.TIN_TUC}/${id}`, data)
+    const ep = getEndpoint("TIN_TUC", "tin_tuc")
+    return this.put<TinTuc>(`${ep}/${id}`, data)
   }
 
   static async deleteTinTuc(id: number): Promise<void> {
-    return this.delete<void>(`${API_CONFIG.ENDPOINTS.TIN_TUC}/${id}`)
+    const ep = getEndpoint("TIN_TUC", "tin_tuc")
+    return this.delete<void>(`${ep}/${id}`)
   }
 
   // ==================== QUYÊN GÓP ====================
   static async getQuyenGop(params?: Record<string, any>): Promise<QuyenGop[]> {
-    return this.get<QuyenGop[]>(API_CONFIG.ENDPOINTS.QUYEN_GOP, params)
+    const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
+    return this.get<QuyenGop[]>(ep, params)
   }
 
   static async createQuyenGop(data: Partial<QuyenGop>): Promise<QuyenGop> {
-    return this.post<QuyenGop>(API_CONFIG.ENDPOINTS.QUYEN_GOP, data)
+    const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
+    return this.post<QuyenGop>(ep, data)
   }
 
   static async updateQuyenGop(id: number, data: Partial<QuyenGop>): Promise<QuyenGop> {
-    return this.put<QuyenGop>(`${API_CONFIG.ENDPOINTS.QUYEN_GOP}/${id}`, data)
+    const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
+    return this.put<QuyenGop>(`${ep}/${id}`, data)
   }
 
   static async deleteQuyenGop(id: number): Promise<void> {
-    return this.delete<void>(`${API_CONFIG.ENDPOINTS.QUYEN_GOP}/${id}`)
+    const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
+    return this.delete<void>(`${ep}/${id}`)
   }
 
   // ==================== TÌNH NGUYỆN VIÊN ====================
   static async getTinhNguyenVien(params?: Record<string, any>): Promise<TinhNguyenVien[]> {
-    return this.get<TinhNguyenVien[]>(API_CONFIG.ENDPOINTS.TINH_NGUYEN_VIEN, params)
+    const ep = getEndpoint("TINH_NGUYEN_VIEN", "tinh_nguyen_vien")
+    return this.get<TinhNguyenVien[]>(ep, params)
   }
 
   static async createTinhNguyenVien(data: Partial<TinhNguyenVien>): Promise<TinhNguyenVien> {
-    return this.post<TinhNguyenVien>(API_CONFIG.ENDPOINTS.TINH_NGUYEN_VIEN, data)
+    const ep = getEndpoint("TINH_NGUYEN_VIEN", "tinh_nguyen_vien")
+    return this.post<TinhNguyenVien>(ep, data)
   }
 
   static async updateTinhNguyenVien(id: number, data: Partial<TinhNguyenVien>): Promise<TinhNguyenVien> {
-    return this.put<TinhNguyenVien>(`${API_CONFIG.ENDPOINTS.TINH_NGUYEN_VIEN}/${id}`, data)
+    const ep = getEndpoint("TINH_NGUYEN_VIEN", "tinh_nguyen_vien")
+    return this.put<TinhNguyenVien>(`${ep}/${id}`, data)
   }
 
   static async deleteTinhNguyenVien(id: number): Promise<void> {
-    return this.delete<void>(`${API_CONFIG.ENDPOINTS.TINH_NGUYEN_VIEN}/${id}`)
+    const ep = getEndpoint("TINH_NGUYEN_VIEN", "tinh_nguyen_vien")
+    return this.delete<void>(`${ep}/${id}`)
   }
 }
 
