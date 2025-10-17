@@ -79,13 +79,13 @@ export function AddUserDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-  {children || (
-    <Button>
-      <UserPlus className="mr-2 h-4 w-4" />
-      Thêm người dùng
-    </Button>
-  )}
-</DialogTrigger>
+        {children || (
+          <Button>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Thêm người dùng
+          </Button>
+        )}
+      </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Thêm người dùng mới</DialogTitle>

@@ -1,5 +1,5 @@
 export const API_CONFIG = {
-  BASE_URL: "http://j2ee.oshi.id.vn:5555/api/v1", // ✅ KHÔNG có slash cuối
+  BASE_URL: "http://j2ee.oshi.id.vn:5555/api/v1", // ✅ khớp CorsConfig backend
 
   ENDPOINTS: {
     AUTH_LOGIN: "auth/login",
@@ -13,12 +13,12 @@ export const API_CONFIG = {
   },
 }
 
-// ✅ Hàm helper build URL
+// ✅ Hàm tạo URL đầy đủ
 export function getApiUrl(endpoint: string): string {
   return `${API_CONFIG.BASE_URL}/${endpoint}`
 }
 
-// ✅ Build query string cho GET
+// ✅ Tạo query string cho GET request
 export function buildQueryString(params: Record<string, any>): string {
   return Object.entries(params)
     .map(([key, val]) => `${encodeURIComponent(key)}=${encodeURIComponent(val)}`)

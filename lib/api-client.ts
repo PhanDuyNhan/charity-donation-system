@@ -148,7 +148,7 @@ export class ApiClient {
 
   static async createNguoiDung(data: Partial<NguoiDung>): Promise<NguoiDung> {
     const ep = getEndpoint("NGUOI_DUNG", "nguoi_dung")
-    return this.post<NguoiDung>(ep, data)
+    return this.patch<NguoiDung>(ep, data)
   }
 
   static async updateNguoiDung(id: number, data: Partial<NguoiDung>): Promise<NguoiDung> {
@@ -171,13 +171,12 @@ export class ApiClient {
 
   static async createDuAn(data: Partial<DuAn>): Promise<DuAn> {
     const ep = getEndpoint("DU_AN", "du_an")
-    return this.post<DuAn>(ep, data)
+    return this.patch<DuAn>(ep, data)
   }
 
   static async updateDuAn(id: number, data: Partial<DuAn>): Promise<DuAn> {
     const ep = getEndpoint("DU_AN", "du_an")
     return this.patch<DuAn>(`${ep}?id=eq.${id}`, data)
-    console.log("🧩 Updating project:", `${ep}?id=eq.${id}`, data)
   }
 
   static async deleteDuAn(id: number): Promise<void> {
