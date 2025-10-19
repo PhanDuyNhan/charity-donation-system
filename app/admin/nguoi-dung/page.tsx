@@ -1,296 +1,271 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Search, Edit, Trash2, UserPlus } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useEffect, useState } from "react"
 import { apiClient } from "@/lib/api-client"
-import type { NguoiDung } from "@/lib/types"
-import { formatShortDate } from "@/lib/utils"
-import { AddUserDialog } from "@/components/add-user-dialog"
+import type { NguoiDung, VaiTroNguoiDung, TrangThaiNguoiDung } from "@/lib/types"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectValue,
+  SelectItem,
+} from "@/components/ui/select"
+import { Plus, Edit2, Trash2, Search } from "lucide-react"
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationLink,
-  PaginationPrevious,
   PaginationNext,
+  PaginationPrevious,
 } from "@/components/ui/pagination"
-import { EditUserDialog } from "@/components/edit-user-dialog" // ✅ Thêm dialog sửa
 
-export default function AdminNguoiDungPage() {
-  const [nguoiDung, setNguoiDung] = useState<NguoiDung[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
+export default function QuanLyNguoiDungPage() {
+  const ALL_VALUE = "__all"
+  const [nguoiDungs, setNguoiDungs] = useState<NguoiDung[]>([])
+  const [search, setSearch] = useState("")
+  const [vaiTro, setVaiTro] = useState<string | undefined>(undefined)
+  const [trangThai, setTrangThai] = useState<string | undefined>(undefined)
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<NguoiDung | null>(null)
+  const [form, setForm] = useState<Partial<NguoiDung>>({})
   const [currentPage, setCurrentPage] = useState(1)
-  const [editingUser, setEditingUser] = useState<NguoiDung | null>(null)
-  const itemsPerPage = 5
+  const itemsPerPage = 8
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     fetchNguoiDung()
   }, [])
 
-  const fetchNguoiDung = async () => {
+  async function fetchNguoiDung() {
+    setLoading(true)
     try {
-      const data = await apiClient.getNguoiDung()
-      setNguoiDung(data)
-    } catch (error) {
-      console.error("❌ Lỗi tải người dùng:", error)
+      const res = await apiClient.getNguoiDung()
+      setNguoiDungs(res || [])
+    } catch (err) {
+      console.error("Lỗi lấy người dùng:", err)
+      alert("Không thể tải danh sách người dùng.")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa người dùng này?")) return
+  function openCreate() {
+    setEditing(null)
+    setForm({})
+    setShowForm(true)
+  }
 
+  function openEdit(user: NguoiDung) {
+    setEditing(user)
+    setForm({
+      ten: user.ten,
+      ho: user.ho,
+      email: user.email,
+      so_dien_thoai: user.so_dien_thoai,
+      dia_chi: user.dia_chi,
+      ngay_sinh: user.ngay_sinh,
+      vai_tro: user.vai_tro,
+      trang_thai: user.trang_thai,
+    })
+    setShowForm(true)
+  }
+
+  async function handleSave() {
     try {
-      await apiClient.deleteNguoiDung(id)
-      setNguoiDung((prev) => prev.filter((n) => n.id !== id))
-    } catch (error) {
-      console.error("❌ Lỗi xóa người dùng:", error)
-      alert("Không thể xóa người dùng này!")
+      if (!form.email || !form.ten || !form.ho) {
+        alert("Vui lòng nhập đủ họ, tên và email.")
+        return
+      }
+
+      if (editing) {
+        await apiClient.updateNguoiDung(editing.id, form)
+        alert("Cập nhật người dùng thành công.")
+      } else {
+        await apiClient.createNguoiDung(form)
+        alert("Thêm người dùng thành công.")
+      }
+
+      setShowForm(false)
+      fetchNguoiDung()
+    } catch (err) {
+      console.error(err)
+      alert("Lưu thất bại.")
     }
   }
 
-  // 🔍 Tìm kiếm nâng cao trên tất cả thuộc tính
-  const filteredNguoiDung = nguoiDung.filter((n) => {
-    if (!searchTerm.trim()) return true
-
-    const term = searchTerm
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-
-    const roleLabels: Record<string, string> = {
-      quan_tri_vien: "quản trị viên",
-      dieu_hanh_vien: "điều hành viên",
-      bien_tap_vien: "biên tập viên",
-      tinh_nguyen_vien: "tình nguyện viên",
-      nguoi_dung: "người dùng",
+  async function handleDelete(user: NguoiDung) {
+    const ok = confirm(`Bạn có chắc muốn xóa người dùng \"${user.ho} ${user.ten}\" không?`)
+    if (!ok) return
+    try {
+      await apiClient.deleteNguoiDung(user.id)
+      alert("Xóa thành công.")
+      fetchNguoiDung()
+    } catch (err) {
+      console.error(err)
+      alert("Xóa thất bại.")
     }
+  }
 
-    const statusLabels: Record<string, string> = {
-      hoat_dong: "hoạt động",
-      bi_khoa: "bị khóa",
-    }
-
-    const combined =
-      `${n.id ?? ""} ${n.ho ?? ""} ${n.ten ?? ""} ${n.email ?? ""} ${n.so_dien_thoai ?? ""} ${n.vai_tro ?? ""} ${
-        roleLabels[n.vai_tro ?? ""] ?? ""
-      } ${n.trang_thai ?? ""} ${statusLabels[n.trang_thai ?? ""] ?? ""} ${n.ngay_tao ?? ""}`
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-
-    return combined.includes(term)
-  })
-
-  // 📄 Phân trang
-  const totalPages = Math.ceil(filteredNguoiDung.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedNguoiDung = filteredNguoiDung.slice(startIndex, startIndex + itemsPerPage)
-
-  // 🎨 Hiển thị Badge vai trò
-  const getRoleBadge = (vaiTro: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      quan_tri_vien: "destructive",
-      dieu_hanh_vien: "default",
-      bien_tap_vien: "secondary",
-      tinh_nguyen_vien: "outline",
-      nguoi_dung: "outline",
-    }
-
-    const labels: Record<string, string> = {
-      quan_tri_vien: "Quản trị viên",
-      dieu_hanh_vien: "Điều hành viên",
-      bien_tap_vien: "Biên tập viên",
-      tinh_nguyen_vien: "Tình nguyện viên",
-      nguoi_dung: "Người dùng",
-    }
-
-    return (
-      <Badge
-        variant={variants[vaiTro] || "outline"}
-        className={`px-3 py-1 text-sm font-semibold rounded-full ${
-          vaiTro === "quan_tri_vien"
-            ? "bg-red-600 text-white"
-            : vaiTro === "dieu_hanh_vien"
-            ? "bg-blue-600 text-white"
-            : vaiTro === "bien_tap_vien"
-            ? "bg-amber-500 text-black"
-            : vaiTro === "tinh_nguyen_vien"
-            ? "bg-slate-400 text-black"
-            : "bg-gray-300 text-black"
-        }`}
-      >
-        {labels[vaiTro] || vaiTro}
-      </Badge>
+  const filtered = nguoiDungs
+    .filter((n) =>
+      search
+        ? `${n.ho} ${n.ten}`.toLowerCase().includes(search.toLowerCase()) ||
+          n.email.toLowerCase().includes(search.toLowerCase())
+        : true
     )
-  }
+    .filter((n) => (vaiTro ? n.vai_tro === vaiTro : true))
+    .filter((n) => (trangThai ? n.trang_thai === trangThai : true))
 
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen text-lg">Đang tải dữ liệu...</div>
+  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+  const stats = {
+    total: nguoiDungs.length,
+    quan_tri_vien: nguoiDungs.filter((n) => n.vai_tro === "quan_tri_vien").length,
+    dieu_hanh_vien: nguoiDungs.filter((n) => n.vai_tro === "dieu_hanh_vien").length,
+    bien_tap_vien: nguoiDungs.filter((n) => n.vai_tro === "bien_tap_vien").length,
+    nguoi_dung: nguoiDungs.filter((n) => n.vai_tro === "nguoi_dung").length,
+    tinh_nguyen_vien: nguoiDungs.filter((n) => n.vai_tro === "tinh_nguyen_vien").length,
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-blue-100">Quản lý Người dùng</h1>
-        <AddUserDialog onUserAdded={fetchNguoiDung}>
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-            <UserPlus className="mr-2 h-4 w-4" /> Thêm người dùng
-          </Button>
-        </AddUserDialog>
-      </div>
-
-      {/* Cards thống kê */}
-      <div className="grid gap-4 md:grid-cols-4">
-        {[
-          { title: "Tổng người dùng", value: nguoiDung.length },
-          { title: "Quản trị viên", value: nguoiDung.filter((n) => n.vai_tro === "quan_tri_vien").length },
-          { title: "Biên tập viên", value: nguoiDung.filter((n) => n.vai_tro === "bien_tap_vien").length },
-          { title: "Tình nguyện viên", value: nguoiDung.filter((n) => n.vai_tro === "tinh_nguyen_vien").length },
-        ].map((card, i) => (
-          <Card key={i} className="shadow-sm hover:shadow-md transition bg-blue-950 border-blue-800">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-blue-100">{card.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-300">{card.value}</div>
+      {/* Thống kê */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {Object.entries({
+          'Tổng người dùng': stats.total,
+          'Quản trị viên': stats.quan_tri_vien,
+          'Điều hành viên': stats.dieu_hanh_vien,
+          'Biên tập viên': stats.bien_tap_vien,
+          'Người dùng': stats.nguoi_dung,
+        }).map(([label, value]) => (
+          <Card key={label}>
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">{label}</p>
+              <p className="text-lg font-semibold">{value}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Ô tìm kiếm */}
-      <Card className="bg-blue-950 border-blue-800">
+      {/* Bộ lọc */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-blue-100">Tìm kiếm người dùng</CardTitle>
+          <CardTitle className="text-base font-semibold">Tìm kiếm & bộ lọc người dùng</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-blue-300" />
-            <Input
-              placeholder="Tìm kiếm theo bất kỳ thông tin nào..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-blue-900 text-blue-100 border-blue-700 placeholder:text-blue-300 focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="flex flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Search size={16} />
+              <Input
+                className="text-sm"
+                placeholder="Tìm theo tên hoặc email"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            <Select onValueChange={(v) => setVaiTro(v && v !== ALL_VALUE ? v : undefined)}>
+              <SelectTrigger className="min-w-[160px] text-sm">
+                <SelectValue placeholder="Vai trò" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_VALUE}>Tất cả</SelectItem>
+                <SelectItem value="quan_tri_vien">Quản trị viên</SelectItem>
+                <SelectItem value="dieu_hanh_vien">Điều hành viên</SelectItem>
+                <SelectItem value="bien_tap_vien">Biên tập viên</SelectItem>
+                <SelectItem value="nguoi_dung">Người dùng</SelectItem>
+                <SelectItem value="tinh_nguyen_vien">Tình nguyện viên</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select onValueChange={(v) => setTrangThai(v && v !== ALL_VALUE ? v : undefined)}>
+              <SelectTrigger className="min-w-[160px] text-sm">
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_VALUE}>Tất cả</SelectItem>
+                <SelectItem value="hoat_dong">Hoạt động</SelectItem>
+                <SelectItem value="khong_hoat_dong">Không hoạt động</SelectItem>
+                <SelectItem value="bi_khoa">Bị khóa</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="flex-1" />
+            <Button className="text-sm" onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />Thêm người dùng
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Bảng dữ liệu */}
-      <Card className="bg-blue-950 border-blue-800">
-        <CardContent className="p-0">
+      {/* Danh sách */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Danh sách người dùng ({filtered.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b border-blue-800 bg-blue-900">
-                <tr className="text-left text-sm font-semibold text-blue-100">
-                  <th className="p-4">Họ tên</th>
-                  <th className="p-4">Email</th>
-                  <th className="p-4">SĐT</th>
-                  <th className="p-4">Vai trò</th>
-                  <th className="p-4">Trạng thái</th>
-                  <th className="p-4">Ngày tạo</th>
-                  <th className="p-4 text-center">Thao tác</th>
+            <table className="w-full table-auto">
+              <thead>
+                <tr className="text-left text-sm text-muted-foreground border-b">
+                  <th className="py-2">Họ tên</th>
+                  <th className="py-2">Email</th>
+                  <th className="py-2">Số điện thoại</th>
+                  <th className="py-2">Vai trò</th>
+                  <th className="py-2">Trạng thái</th>
+                  <th className="py-2">Hành động</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedNguoiDung.map((n) => (
-                  <tr key={n.id} className="border-b border-blue-800 hover:bg-blue-900 transition">
-                    <td className="p-4 font-medium text-blue-100">{`${n.ho} ${n.ten}`}</td>
-                    <td className="p-4 text-blue-100">{n.email || "-"}</td>
-                    <td className="p-4 text-blue-100">{n.so_dien_thoai || "-"}</td>
-                    <td className="p-4">{getRoleBadge(n.vai_tro)}</td>
-                    <td className="p-4">
-                      {n.trang_thai === "hoat_dong" ? (
-                        <Badge className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                          Hoạt động
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-red-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                          Bị khóa
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="p-4 text-sm text-blue-300">
-                      {n.ngay_tao ? formatShortDate(n.ngay_tao) : "-"}
-                    </td>
-                    <td className="p-4 text-center">
-                      <div className="flex gap-2 justify-center">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="border-blue-700 hover:bg-blue-800"
-                          onClick={() => setEditingUser(n)}
-                        >
-                          <Edit className="h-4 w-4 text-blue-400" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="border-red-700 hover:bg-red-800"
-                          onClick={() => handleDelete(n.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {loading ? (
+                  <tr><td colSpan={6} className="py-6 text-center text-sm">Đang tải...</td></tr>
+                ) : paginated.length === 0 ? (
+                  <tr><td colSpan={6} className="py-6 text-center text-sm">Không có người dùng</td></tr>
+                ) : (
+                  paginated.map((n) => (
+                    <tr key={n.id} className="border-b text-sm">
+                      <td className="py-2">{`${n.ho} ${n.ten}`}</td>
+                      <td className="py-2">{n.email}</td>
+                      <td className="py-2">{n.so_dien_thoai ?? "-"}</td>
+                      <td className="py-2 capitalize">{n.vai_tro.replaceAll("_", " ")}</td>
+                      <td className="py-2">{n.trang_thai}</td>
+                      <td className="py-2">
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" className="text-xs" onClick={() => openEdit(n)}>
+                            <Edit2 className="mr-1 h-3.5 w-3.5" />Sửa
+                          </Button>
+                          <Button size="sm" variant="destructive" className="text-xs" onClick={() => handleDelete(n)}>
+                            <Trash2 className="mr-1 h-3.5 w-3.5" />Xóa
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
 
-          {/* PHÂN TRANG */}
           {totalPages > 1 && (
-            <Pagination className="py-6">
+            <Pagination className="mt-6">
               <PaginationContent>
                 <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      if (currentPage > 1) setCurrentPage(currentPage - 1)
-                    }}
-                    className={currentPage === 1 ? "opacity-50 pointer-events-none" : ""}
-                  />
+                  <PaginationPrevious onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} />
                 </PaginationItem>
-
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <PaginationItem key={page}>
-                    <PaginationLink
-                      href="#"
-                      isActive={page === currentPage}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        setCurrentPage(page)
-                      }}
-                      className={
-                        page === currentPage
-                          ? "bg-blue-600 text-white border border-blue-700"
-                          : "text-blue-300 hover:bg-blue-800"
-                      }
-                    >
-                      {page}
+                {[...Array(totalPages)].map((_, i) => (
+                  <PaginationItem key={i}>
+                    <PaginationLink isActive={currentPage === i + 1} onClick={() => setCurrentPage(i + 1)}>
+                      {i + 1}
                     </PaginationLink>
                   </PaginationItem>
                 ))}
-
                 <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      if (currentPage < totalPages) setCurrentPage(currentPage + 1)
-                    }}
-                    className={currentPage === totalPages ? "opacity-50 pointer-events-none" : ""}
-                  />
+                  <PaginationNext onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} />
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
@@ -298,21 +273,84 @@ export default function AdminNguoiDungPage() {
         </CardContent>
       </Card>
 
-      {/* Không tìm thấy */}
-      {filteredNguoiDung.length === 0 && (
-        <Card className="bg-blue-950 border-blue-800">
-          <CardContent className="p-12 text-center">
-            <p className="text-blue-300">Không tìm thấy người dùng nào</p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Form thêm/sửa */}
+      {showForm && (
+  <div className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center">
+    <div className="bg-white dark:bg-slate-900 p-6 rounded-lg w-full max-w-lg shadow-xl z-50 border border-slate-200 dark:border-slate-700">
+      <h2 className="text-lg font-semibold mb-4 text-slate-800 dark:text-slate-100">
+        {editing ? "Chỉnh sửa người dùng" : "Thêm người dùng"}
+      </h2>
+      <div className="space-y-3">
+        <Input
+          placeholder="Họ"
+          className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500"
+          value={form.ho || ""}
+          onChange={(e) => setForm({ ...form, ho: e.target.value })}
+        />
+        <Input
+          placeholder="Tên"
+          className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500"
+          value={form.ten || ""}
+          onChange={(e) => setForm({ ...form, ten: e.target.value })}
+        />
+        <Input
+          placeholder="Email"
+          className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500"
+          value={form.email || ""}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+        />
+        <Input
+          placeholder="Số điện thoại"
+          className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500"
+          value={form.so_dien_thoai || ""}
+          onChange={(e) => setForm({ ...form, so_dien_thoai: e.target.value })}
+        />
+        <Input
+          placeholder="Địa chỉ"
+          className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500"
+          value={form.dia_chi || ""}
+          onChange={(e) => setForm({ ...form, dia_chi: e.target.value })}
+        />
 
-      {/* Hộp thoại sửa người dùng */}
-      <EditUserDialog
-        user={editingUser}
-        onClose={() => setEditingUser(null)}
-        onUpdated={fetchNguoiDung}
-      />
+        <Select
+          onValueChange={(v) => setForm({ ...form, vai_tro: v as VaiTroNguoiDung })}
+          defaultValue={form.vai_tro}
+        >
+          <SelectTrigger className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100">
+            <SelectValue placeholder="Vai trò" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="quan_tri_vien">Quản trị viên</SelectItem>
+            <SelectItem value="dieu_hanh_vien">Điều hành viên</SelectItem>
+            <SelectItem value="bien_tap_vien">Biên tập viên</SelectItem>
+            <SelectItem value="nguoi_dung">Người dùng</SelectItem>
+            <SelectItem value="tinh_nguyen_vien">Tình nguyện viên</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          onValueChange={(v) => setForm({ ...form, trang_thai: v as TrangThaiNguoiDung })}
+          defaultValue={form.trang_thai}
+        >
+          <SelectTrigger className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100">
+            <SelectValue placeholder="Trạng thái" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="hoat_dong">Hoạt động</SelectItem>
+            <SelectItem value="khong_hoat_dong">Không hoạt động</SelectItem>
+            <SelectItem value="bi_khoa">Bị khóa</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={() => setShowForm(false)}>Hủy</Button>
+          <Button onClick={handleSave}>Lưu</Button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   )
 }

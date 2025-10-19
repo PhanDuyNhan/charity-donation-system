@@ -1,10 +1,12 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Heart, ArrowRight, HandHeart, Target, Shield } from "lucide-react"
-import { useAuth } from "@/lib/auth" 
+import { useAuth } from "@/lib/auth"
+import { apiClient } from "@/lib/api-client"
 export default function HomePage() {
   const { user, isAuthenticated, logout } = useAuth() // 👈 lấy state đăng nhập
   return (
@@ -50,24 +52,7 @@ export default function HomePage() {
       {/* Stats Section */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div className="text-center space-y-2">
-              <div className="text-4xl font-bold text-(--color-primary)">1,234</div>
-              <div className="text-sm text-(--color-foreground-secondary)">Dự Án Hoàn Thành</div>
-            </div>
-            <div className="text-center space-y-2">
-              <div className="text-4xl font-bold text-(--color-secondary)">45,678</div>
-              <div className="text-sm text-(--color-foreground-secondary)">Người Quyên Góp</div>
-            </div>
-            <div className="text-center space-y-2">
-              <div className="text-4xl font-bold text-(--color-accent)">2,345</div>
-              <div className="text-sm text-(--color-foreground-secondary)">Tình Nguyện Viên</div>
-            </div>
-            <div className="text-center space-y-2">
-              <div className="text-4xl font-bold text-(--color-success)">89 tỷ</div>
-              <div className="text-sm text-(--color-foreground-secondary)">Đồng Quyên Góp</div>
-            </div>
-          </div>
+          <StatsBlock />
         </div>
       </section>
 
@@ -283,6 +268,104 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+    </div>
+  )
+}
+
+function formatNumber(n: number) {
+  // Format large VND numbers nicely
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)} tỷ`
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
+  if (n >= 1_000) return n.toLocaleString()
+  return String(n)
+}
+
+function StatsBlock() {
+  const [projectsCompleted, setProjectsCompleted] = useState<number | null>(null)
+  const [uniqueDonors, setUniqueDonors] = useState<number | null>(null)
+  const [volunteersCount, setVolunteersCount] = useState<number | null>(null)
+  const [totalDonations, setTotalDonations] = useState<number | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadStats() {
+      try {
+        // 1) Projects completed
+
+        // Using PostgREST-style filters (eq.) so queries match backend expectations
+        const projects = await apiClient.getDuAn({ trang_thai: "eq.hoan_thanh", select: "id" })
+
+        // Donations: fetch all donors (for unique count) and completed donations (for sum)
+        const donationsAll = await apiClient.getQuyenGop({ select: "ma_nguoi_dung,email_nguoi_quyen_gop" })
+        const donationsCompleted = await apiClient.getQuyenGop({ select: "so_tien", trang_thai_thanh_toan: "eq.hoan_thanh" })
+
+        // Volunteers
+        const volunteers = await apiClient.getTinhNguyenVien({ select: "id,ma_nguoi_dung" })
+
+        if (!mounted) return
+
+        setProjectsCompleted(Array.isArray(projects) ? projects.length : 0)
+
+        // compute unique donors from donationsAll
+        const donors = new Set<string | number>()
+        if (Array.isArray(donationsAll)) {
+          donationsAll.forEach((d: any) => {
+            const key = d.ma_nguoi_dung ?? d.email_nguoi_quyen_gop ?? JSON.stringify(d)
+            donors.add(key)
+          })
+        }
+
+        // sum amounts from completed donations
+        let sum = 0
+        if (Array.isArray(donationsCompleted)) {
+          donationsCompleted.forEach((d: any) => {
+            const amount = typeof d.so_tien === "number" ? d.so_tien : Number(d.so_tien) || 0
+            sum += amount
+          })
+        }
+
+        setUniqueDonors(donors.size)
+        setTotalDonations(sum)
+        setVolunteersCount(Array.isArray(volunteers) ? volunteers.length : 0)
+      } catch (err) {
+        console.error("Stats load failed", err)
+        if (mounted) {
+          setProjectsCompleted(0)
+          setUniqueDonors(0)
+          setVolunteersCount(0)
+          setTotalDonations(0)
+        }
+      }
+    }
+
+    loadStats()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+      <div className="text-center space-y-2">
+        <div className="text-4xl font-bold text-(--color-primary)">{projectsCompleted == null ? "—" : projectsCompleted.toLocaleString()}</div>
+        <div className="text-sm text-(--color-foreground-secondary)">Dự Án Hoàn Thành</div>
+      </div>
+
+      <div className="text-center space-y-2">
+        <div className="text-4xl font-bold text-(--color-secondary)">{uniqueDonors == null ? "—" : uniqueDonors.toLocaleString()}</div>
+        <div className="text-sm text-(--color-foreground-secondary)">Người Quyên Góp</div>
+      </div>
+
+      <div className="text-center space-y-2">
+        <div className="text-4xl font-bold text-(--color-accent)">{volunteersCount == null ? "—" : volunteersCount.toLocaleString()}</div>
+        <div className="text-sm text-(--color-foreground-secondary)">Tình Nguyện Viên</div>
+      </div>
+
+      <div className="text-center space-y-2">
+        <div className="text-4xl font-bold text-(--color-success)">{totalDonations == null ? "—" : formatNumber(totalDonations)}</div>
+        <div className="text-sm text-(--color-foreground-secondary)">Đồng Quyên Góp</div>
+      </div>
     </div>
   )
 }

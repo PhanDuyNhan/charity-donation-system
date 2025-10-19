@@ -63,7 +63,7 @@ export interface DuAn {
   dia_diem?: string
   so_nguoi_thu_huong?: number
   anh_dai_dien?: string
-  thu_vien_anh?: string | null
+  thu_vien_anh?: string []
   muc_do_uu_tien?: MucDoUuTien
   nguoi_tao: number
   nguoi_phe_duyet?: number | null

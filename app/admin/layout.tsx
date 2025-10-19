@@ -58,6 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const menuItems = [
     { icon: LayoutDashboard, label: "Tổng Quan", href: "/admin" },
     { icon: FolderKanban, label: "Quản Lý Dự Án", href: "/admin/du-an" },
+    {icon: FolderKanban, label: "Quản Lý Danh Mục", href: "/admin/danh-muc-du-an" },
     { icon: DollarSign, label: "Quản Lý Quyên Góp", href: "/admin/quyen-gop" },
     { icon: Users, label: "Quản Lý Người Dùng", href: "/admin/nguoi-dung" },
     { icon: Users, label: "Tình Nguyện Viên", href: "/admin/tinh-nguyen-vien" },
