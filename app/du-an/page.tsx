@@ -118,9 +118,9 @@ export default function DuAnPage() {
                       <div className="relative h-48 overflow-hidden">
                         <img
                           src={
-                            project.anh_dai_dien?.startsWith("http")
+                            project.anh_dai_dien?.startsWith("https")
                               ? project.anh_dai_dien
-                              : `http://j2ee.oshi.id.vn:5555${project.anh_dai_dien}`
+                              : `https://j2ee.oshi.id.vn${project.anh_dai_dien}`
                           }
                           alt={project.tieu_de}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
