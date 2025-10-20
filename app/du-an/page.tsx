@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Heart, Search, Filter, MapPin, Calendar } from "lucide-react"
+import { Search, Filter, MapPin, Calendar, XCircle } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
 import {
   Pagination,
@@ -18,89 +18,230 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 
+// Hàm loại bỏ dấu để lọc chữ tiếng Việt
+function normalizeString(str: string) {
+  return str
+    ?.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim()
+}
+
 export default function DuAnPage() {
   const [projects, setProjects] = useState<any[]>([])
+  const [filteredProjects, setFilteredProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [categories, setCategories] = useState<any[]>([])
+  const [provinces, setProvinces] = useState<any[]>([])
+
+  const [search, setSearch] = useState("")
+  const [category, setCategory] = useState("__all")
+  const [province, setProvince] = useState("__all")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+
   const itemsPerPage = 6
 
   useEffect(() => {
-    const loadProjects = async () => {
+    const loadData = async () => {
       try {
-        console.log("🔹 Đang fetch danh sách dự án...")
-        const response = await apiClient.getDuAn({})
-        console.log("✅ Kết quả API:", response)
-        setProjects(response)
-      } catch (err: any) {
-        console.error("❌ Lỗi khi fetch dự án:", err)
-        setError("Không thể tải danh sách dự án. Vui lòng thử lại sau.")
+        const [duAnRes, danhMucRes, provRes] = await Promise.all([
+          apiClient.getDuAn({}),
+          apiClient.getDanhMucDuAn(),
+          fetch("https://provinces.open-api.vn/api/?depth=1").then((r) => r.json()),
+        ])
+        setProjects(duAnRes)
+        setFilteredProjects(duAnRes)
+        setCategories(danhMucRes)
+        setProvinces(provRes)
+      } catch (err) {
+        console.error("❌ Lỗi khi fetch dữ liệu:", err)
+        setError("Không thể tải danh sách dự án.")
       } finally {
         setLoading(false)
       }
     }
-    loadProjects()
+    loadData()
   }, [])
 
-  const totalPages = Math.ceil(projects.length / itemsPerPage)
-  const paginatedProjects = projects.slice(
+  // Lọc dữ liệu
+  useEffect(() => {
+    let filtered = [...projects]
+
+    if (search.trim()) {
+      const keyword = normalizeString(search)
+      filtered = filtered.filter(
+        (p) =>
+          normalizeString(p.tieu_de || "").includes(keyword) ||
+          normalizeString(p.mo_ta_ngan || "").includes(keyword)
+      )
+    }
+
+    if (category !== "__all") {
+      filtered = filtered.filter((p) => String(p.ma_danh_muc) === category)
+    }
+
+    if (province !== "__all") {
+      const normalizedProvince = normalizeString(province)
+      filtered = filtered.filter((p) =>
+        normalizeString(p.dia_diem || "").includes(normalizedProvince)
+      )
+    }
+
+    if (startDate) {
+      filtered = filtered.filter((p) => new Date(p.ngay_bat_dau) >= new Date(startDate))
+    }
+
+    if (endDate) {
+      filtered = filtered.filter((p) => new Date(p.ngay_ket_thuc) <= new Date(endDate))
+    }
+
+    setFilteredProjects(filtered)
+    setCurrentPage(1)
+  }, [search, category, province, startDate, endDate, projects])
+
+  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage)
+  const paginatedProjects = filteredProjects.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    window.scrollTo({ top: 400, behavior: "smooth" }) // Cuộn nhẹ lên đầu
+    window.scrollTo({ top: 400, behavior: "smooth" })
   }
 
-  if (loading)
-    return <div className="text-center py-20 text-gray-500">Đang tải dữ liệu...</div>
-  if (error)
-    return <div className="text-center py-20 text-red-500">{error}</div>
+  if (loading) return <div className="text-center py-20 text-gray-500">Đang tải dữ liệu...</div>
+  if (error) return <div className="text-center py-20 text-red-500">{error}</div>
 
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-blue-50 to-green-50 py-12">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Các Dự Án Từ Thiện</h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Khám phá và đóng góp cho các dự án đang cần sự hỗ trợ của bạn 💗
-            </p>
-          </div>
+        <div className="container mx-auto px-4 text-center mb-8">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Các Dự Án Từ Thiện</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Khám phá và đóng góp cho các dự án đang cần sự hỗ trợ của bạn 💗
+          </p>
+        </div>
 
-          {/* Search and Filter */}
-          <div className="max-w-4xl mx-auto">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                <Input placeholder="Tìm kiếm dự án..." className="pl-10" />
+        {/* Bộ lọc */}
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="bg-muted/20 rounded-lg p-4 space-y-4">
+            <div className="flex flex-col md:flex-row items-center gap-3">
+              <div className="flex-1 relative w-full">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm kiếm dự án..."
+                  className="pl-9 h-9 text-sm"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-              <Select>
-                <SelectTrigger className="w-full md:w-[200px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Danh mục" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="giao-duc">Giáo dục</SelectItem>
-                  <SelectItem value="y-te">Y tế</SelectItem>
-                  <SelectItem value="moi-truong">Môi trường</SelectItem>
-                  <SelectItem value="tre-em">Trẻ em</SelectItem>
-                  <SelectItem value="nguoi-cao-tuoi">Người cao tuổi</SelectItem>
-                </SelectContent>
-              </Select>
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearch("")
+                  setCategory("__all")
+                  setProvince("__all")
+                  setStartDate("")
+                  setEndDate("")
+                }}
+                className="text-sm flex items-center gap-2 h-9 px-3"
+              >
+                <XCircle className="w-4 h-4" /> Xóa bộ lọc
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+              {/* Danh mục */}
+              <div>
+                <label className="text-[13px] font-semibold mb-1 flex items-center gap-1">
+                  <Filter className="w-4 h-4 text-primary" /> Danh mục
+                </label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Chọn danh mục" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all">Tất cả</SelectItem>
+                    {categories.map((dm) => (
+                      <SelectItem key={dm.id} value={String(dm.id)}>
+                        {dm.ten}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Địa điểm */}
+              <div>
+                <label className="text-[13px] font-semibold mb-1 flex items-center gap-1">
+                  <MapPin className="w-4 h-4 text-primary" /> Địa điểm
+                </label>
+                <Select value={province} onValueChange={setProvince}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Chọn tỉnh/thành" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all">Tất cả</SelectItem>
+                    {provinces.map((p) => (
+                      <SelectItem key={p.code} value={p.name}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Ngày bắt đầu */}
+              <div>
+                <label className="text-[13px] font-semibold mb-1 flex items-center gap-1">
+                  <Calendar className="w-4 h-4 text-primary" /> Từ ngày
+                </label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
+
+              {/* Ngày kết thúc */}
+              <div>
+                <label className="text-[13px] font-semibold mb-1 flex items-center gap-1">
+                  <Calendar className="w-4 h-4 text-primary" /> Đến ngày
+                </label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
+
+              {/* Số dự án */}
+              <div className="flex items-end justify-end">
+                <div className="bg-primary/10 text-primary font-medium text-sm px-3 py-1.5 rounded-full inline-flex items-center gap-1">
+                  <Filter className="w-4 h-4" />
+                  {filteredProjects.length} dự án
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Projects Grid */}
+      {/* Danh sách dự án */}
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
-          {paginatedProjects.length === 0 ? (
-            <p className="text-center text-gray-500">Chưa có dự án nào được đăng.</p>
+          {filteredProjects.length === 0 ? (
+            <p className="text-center text-gray-500">Không tìm thấy dự án phù hợp.</p>
           ) : (
             <>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
@@ -113,8 +254,9 @@ export default function DuAnPage() {
                   return (
                     <Card
                       key={project.id}
-                      className="overflow-hidden hover:shadow-xl transition-shadow duration-300"
+                      className="overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col h-full"
                     >
+                      {/* Ảnh & trạng thái */}
                       <div className="relative h-48 overflow-hidden">
                         <img
                           src={
@@ -125,14 +267,13 @@ export default function DuAnPage() {
                           alt={project.tieu_de}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                         />
-                        <Badge className="absolute top-4 right-4 bg-secondary text-white">
-                          {project.trang_thai === "hoat_dong"
-                            ? "Đang hoạt động"
-                            : "Sắp diễn ra"}
+                        <Badge className="absolute top-4 right-4 bg-secondary text-white shadow-md">
+                          {project.trang_thai === "hoat_dong" ? "Đang hoạt động" : "Sắp diễn ra"}
                         </Badge>
                       </div>
 
-                      <CardHeader>
+                      {/* Nội dung */}
+                      <CardHeader className="pb-2">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                           <Badge variant="outline">
                             {project.muc_do_uu_tien?.replace("_", " ")}
@@ -142,14 +283,15 @@ export default function DuAnPage() {
                             {project.dia_diem}
                           </span>
                         </div>
-                        <CardTitle className="text-xl">{project.tieu_de}</CardTitle>
+                        <CardTitle className="text-lg">{project.tieu_de}</CardTitle>
                         <CardDescription className="line-clamp-2">
                           {project.mo_ta_ngan}
                         </CardDescription>
                       </CardHeader>
 
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
+                      {/* Tiến độ + nút quyên góp */}
+                      <CardContent className="flex flex-col justify-between flex-1 space-y-4">
+                        <div className="space-y-3">
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Đã quyên góp</span>
                             <span className="font-semibold text-primary">
@@ -170,17 +312,17 @@ export default function DuAnPage() {
                               / {project.so_tien_muc_tieu.toLocaleString("vi-VN")} đ
                             </span>
                           </div>
+
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="h-4 w-4" />
+                            <span>
+                              {new Date(project.ngay_bat_dau).toLocaleDateString("vi-VN")} -{" "}
+                              {new Date(project.ngay_ket_thuc).toLocaleDateString("vi-VN")}
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar className="h-4 w-4" />
-                          <span>
-                            {new Date(project.ngay_bat_dau).toLocaleDateString("vi-VN")} -{" "}
-                            {new Date(project.ngay_ket_thuc).toLocaleDateString("vi-VN")}
-                          </span>
-                        </div>
-
-                        <Link href={`/du-an/${project.id}`}>
+                        <Link href={`/du-an/${project.id}`} className="mt-auto">
                           <Button className="w-full">Quyên Góp Ngay</Button>
                         </Link>
                       </CardContent>
@@ -239,10 +381,9 @@ export default function DuAnPage() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-foreground text-white py-12 mt-12">
         <div className="container mx-auto px-4 text-center text-sm text-white/70">
-          <p>&copy; 2025 Từ Thiện Việt. Tất cả quyền được bảo lưu.</p>
+          © 2025 Từ Thiện Việt. Tất cả quyền được bảo lưu.
         </div>
       </footer>
     </div>
