@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { apiClient } from "@/lib/api-client"
-import type { DuAn, DanhMucDuAn, TrangThaiDuAn } from "@/lib/types"
+import type { DuAn, DanhMucDuAn } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Plus, Edit2, Trash2, Search } from "lucide-react"
 import {
   Pagination,
@@ -19,7 +19,10 @@ import {
 } from "@/components/ui/pagination"
 
 export default function AdminDuAnPage() {
+  const router = useRouter()
   const ALL_VALUE = "__all"
+
+  // dữ liệu
   const [duAns, setDuAns] = useState<DuAn[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -37,27 +40,19 @@ export default function AdminDuAnPage() {
   // danh muc
   const [danhMucs, setDanhMucs] = useState<DanhMucDuAn[]>([])
 
-  // modal / form
-  const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<DuAn | null>(null)
-  const [form, setForm] = useState<Partial<DuAn>>({})
-  const [provinces, setProvinces] = useState<any[]>([])
-  const [uploading, setUploading] = useState(false)
-  const [thuVienAnhUploading, setThuVienAnhUploading] = useState(false)
-
   useEffect(() => {
     fetchAll()
     fetchDanhMuc()
-    fetchProvinces()
   }, [])
 
   async function fetchAll() {
     setLoading(true)
     try {
+      // apiClient.getDuAn() theo api-client.ts
       const res = await apiClient.getDuAn()
-      setDuAns(res || [])
+      setDuAns(Array.isArray(res) ? res : [])
     } catch (err) {
-      console.error(err)
+      console.error("Lỗi khi lấy dự án:", err)
       alert("Lấy danh sách dự án thất bại. Kiểm tra console.")
     } finally {
       setLoading(false)
@@ -67,136 +62,60 @@ export default function AdminDuAnPage() {
   async function fetchDanhMuc() {
     try {
       const res = await apiClient.getDanhMucDuAn()
-      setDanhMucs(res || [])
+      setDanhMucs(Array.isArray(res) ? res : [])
     } catch (err) {
-      console.error(err)
-    }
-  }
-
-  async function fetchProvinces() {
-    try {
-      const r = await fetch("https://provinces.open-api.vn/api/?depth=1")
-      if (!r.ok) return
-      const data = await r.json()
-      setProvinces(data)
-    } catch (err) {
-      console.error("Không lấy được list tỉnh:", err)
+      console.error("Lỗi khi lấy danh mục:", err)
     }
   }
 
   function openCreate() {
-    setEditing(null)
-    setForm({})
-    setShowForm(true)
+    router.push("/admin/du-an/them")
   }
 
   function openEdit(item: DuAn) {
-    setEditing(item)
-    setForm({
-      tieu_de: item.tieu_de,
-      mo_ta: item.mo_ta,
-      ma_danh_muc: item.ma_danh_muc,
-      so_tien_muc_tieu: item.so_tien_muc_tieu,
-      ngay_bat_dau: item.ngay_bat_dau,
-      ngay_ket_thuc: item.ngay_ket_thuc,
-      dia_diem: item.dia_diem,
-      anh_dai_dien: item.anh_dai_dien,
-      thu_vien_anh: (item.thu_vien_anh ?? []) as string[],
-    })
-    setShowForm(true)
-  }
-
-  async function handleSave() {
-    try {
-      if (!form.tieu_de || !form.ma_danh_muc) {
-        alert("Vui lòng nhập tiêu đề và chọn danh mục")
-        return
-      }
-
-      if (editing) {
-        await apiClient.updateDuAn(editing.id, form)
-        alert("Cập nhật dự án thành công")
-      } else {
-        await apiClient.createDuAn(form)
-        alert("Tạo dự án thành công")
-      }
-      setShowForm(false)
-      fetchAll()
-    } catch (err) {
-      console.error(err)
-      alert("Lưu dự án thất bại.")
-    }
+    router.push(`/admin/du-an/${item.id}/sua`)
   }
 
   async function handleDelete(item: DuAn) {
     const ok = confirm(`Bạn có chắc muốn xóa dự án: "${item.tieu_de}" không?`)
     if (!ok) return
     try {
-      await apiClient.deleteDuAn(item.id)
+      // apiClient.deleteDuAn(id)
+      await apiClient.deleteDuAn(Number(item.id))
       alert("Xóa thành công")
       fetchAll()
     } catch (err) {
-      console.error(err)
-      alert("Xóa thất bại.")
+      console.error("Xóa thất bại:", err)
+      alert("Xóa thất bại. Kiểm tra console.")
     }
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      // @ts-ignore
-      const resp = await apiClient.uploadFile(file)
-      const url = resp.url ?? resp.path
-      setForm((s) => ({ ...s, anh_dai_dien: url }))
-    } catch (err) {
-      alert("Upload ảnh thất bại")
-    } finally {
-      setUploading(false)
-    }
+  // helper lấy tên danh mục từ danhMucs
+  function getCategoryName(ma: any) {
+    if (ma === undefined || ma === null) return ""
+    const id = Number(ma)
+    const found = danhMucs.find((d) => Number((d as any).id) === id)
+    return found ? (found as any).ten ?? (found as any).name ?? String(id) : String(id)
   }
 
-  async function handleGalleryChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || [])
-    if (files.length === 0) return
-    setThuVienAnhUploading(true)
-    try {
-      const uploaded: string[] = []
-      for (const f of files) {
-        // @ts-ignore
-        const resp = await apiClient.uploadFile(f)
-        const url = resp.url ?? resp.path
-        if (url) uploaded.push(url)
-      }
-      setForm((s) => ({ ...s, thu_vien_anh: [...(s.thu_vien_anh ?? []), ...uploaded] }))
-    } finally {
-      setThuVienAnhUploading(false)
-    }
-  }
-
-  function removeGalleryImage(idx: number) {
-    setForm((s) => ({ ...s, thu_vien_anh: (s.thu_vien_anh || []).filter((_, i) => i !== idx) }))
-  }
-
-  // lọc
+  // filter logic
   const filtered = duAns
-    .filter((d) => (search ? d.tieu_de?.toLowerCase().includes(search.toLowerCase()) : true))
-    .filter((d) => (categoryId ? d.ma_danh_muc === categoryId : true))
+    .filter((d) => (search ? (d.tieu_de ?? "").toLowerCase().includes(search.toLowerCase()) : true))
+    .filter((d) => (categoryId ? Number(d.ma_danh_muc) === categoryId : true))
     .filter((d) => (statusFilter ? String(d.trang_thai) === statusFilter : true))
     .filter((d) => {
       if (month === "__all" && year === "__all") return true
-      const startDate = new Date(d.ngay_bat_dau)
-      const monthMatch = month === "__all" || startDate.getMonth() + 1 === Number(month)
-      const yearMatch = year === "__all" || startDate.getFullYear() === Number(year)
+      const startDate = d.ngay_bat_dau ? new Date(d.ngay_bat_dau) : null
+      const monthMatch = month === "__all" || (startDate ? startDate.getMonth() + 1 === Number(month) : false)
+      const yearMatch = year === "__all" || (startDate ? startDate.getFullYear() === Number(year) : false)
       return monthMatch && yearMatch
     })
 
-  // phân trang
-  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+  // pagination
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage))
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
-  // thống kê
+  // stats
   const stats = {
     total: duAns.length,
     hoat_dong: duAns.filter((d) => d.trang_thai === "hoat_dong").length,
@@ -205,8 +124,14 @@ export default function AdminDuAnPage() {
     hoan_thanh: duAns.filter((d) => d.trang_thai === "hoan_thanh").length,
   }
 
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages])
+
   return (
     <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Quản lý Dự Án</h1>
       {/* Thống kê */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
@@ -239,25 +164,25 @@ export default function AdminDuAnPage() {
       <Card>
         <CardHeader><CardTitle className="text-base font-semibold">Tìm kiếm & bộ lọc</CardTitle></CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 items-center">
             <div className="flex items-center gap-2">
               <Search size={16} />
-              <Input className="text-sm" placeholder="Tìm theo tiêu đề" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input className="text-sm" placeholder="Tìm theo tiêu đề" value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} />
             </div>
 
             {/* Danh mục */}
-            <Select onValueChange={(v) => setCategoryId(v && v !== ALL_VALUE ? Number(v) : undefined)}>
+            <Select onValueChange={(v) => { setCategoryId(v && v !== ALL_VALUE ? Number(v) : undefined); setCurrentPage(1); }}>
               <SelectTrigger className="min-w-[160px] text-sm">
                 <SelectValue placeholder="Danh mục" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_VALUE}>Tất cả</SelectItem>
-                {danhMucs.map((dm) => <SelectItem key={dm.id} value={String(dm.id)}>{dm.ten}</SelectItem>)}
+                {danhMucs.map((dm) => <SelectItem key={(dm as any).id} value={String((dm as any).id)}>{(dm as any).ten ?? (dm as any).name}</SelectItem>)}
               </SelectContent>
             </Select>
 
             {/* Trạng thái */}
-            <Select onValueChange={(v) => setStatusFilter(v && v !== ALL_VALUE ? v : undefined)}>
+            <Select onValueChange={(v) => { setStatusFilter(v && v !== ALL_VALUE ? v : undefined); setCurrentPage(1); }}>
               <SelectTrigger className="min-w-[140px] text-sm">
                 <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
@@ -271,7 +196,7 @@ export default function AdminDuAnPage() {
             </Select>
 
             {/* Tháng */}
-            <Select onValueChange={(v) => setMonth(v)}>
+            <Select onValueChange={(v) => { setMonth(v); setCurrentPage(1); }}>
               <SelectTrigger className="w-[110px] text-sm">
                 <SelectValue placeholder="Tháng" />
               </SelectTrigger>
@@ -284,7 +209,7 @@ export default function AdminDuAnPage() {
             </Select>
 
             {/* Năm */}
-            <Select onValueChange={(v) => setYear(v)}>
+            <Select onValueChange={(v) => { setYear(v); setCurrentPage(1); }}>
               <SelectTrigger className="w-[110px] text-sm">
                 <SelectValue placeholder="Năm" />
               </SelectTrigger>
@@ -329,8 +254,8 @@ export default function AdminDuAnPage() {
                   paginated.map((d) => (
                     <tr key={d.id} className="border-b text-sm">
                       <td className="py-2">{d.tieu_de}</td>
-                      <td className="py-2">{d.ma_danh_muc}</td>
-                      <td className="py-2">{d.so_tien_muc_tieu?.toLocaleString?.() ?? ""}</td>
+                      <td className="py-2">{getCategoryName(d.ma_danh_muc)}</td>
+                      <td className="py-2">{Number(d.so_tien_muc_tieu || 0).toLocaleString()}</td>
                       <td className="py-2">{d.dia_diem}</td>
                       <td className="py-2">{d.trang_thai}</td>
                       <td className="py-2">
@@ -356,7 +281,7 @@ export default function AdminDuAnPage() {
                 <PaginationItem>
                   <PaginationPrevious onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} />
                 </PaginationItem>
-                {[...Array(totalPages)].map((_, i) => (
+                {Array.from({ length: totalPages }).map((_, i) => (
                   <PaginationItem key={i}>
                     <PaginationLink
                       isActive={currentPage === i + 1}
@@ -374,172 +299,6 @@ export default function AdminDuAnPage() {
           )}
         </CardContent>
       </Card>
-      {/* Form thêm / sửa dự án */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl w-full max-w-3xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-y-auto max-h-[90vh]">
-            <h2 className="text-xl font-semibold mb-6 text-slate-800 dark:text-slate-100">
-              {editing ? "Chỉnh sửa dự án" : "Thêm dự án"}
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
-                  Tiêu đề
-                </label>
-                <Input
-                  placeholder="Nhập tiêu đề dự án"
-                  className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                  value={form.tieu_de || ""}
-                  onChange={(e) => setForm({ ...form, tieu_de: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
-                  Số tiền mục tiêu
-                </label>
-                <Input
-                  type="number"
-                  placeholder="Nhập số tiền mục tiêu"
-                  className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                  value={form.so_tien_muc_tieu || ""}
-                  onChange={(e) =>
-                    setForm({ ...form, so_tien_muc_tieu: Number(e.target.value) })
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
-                  Danh mục
-                </label>
-                <Select
-                  onValueChange={(v) => setForm({ ...form, ma_danh_muc: Number(v) })}
-                  defaultValue={String(form.ma_danh_muc || "")}
-                >
-                  <SelectTrigger className="bg-gray-100 dark:bg-slate-800">
-                    <SelectValue placeholder="Chọn danh mục" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {danhMucs.map((dm) => (
-                      <SelectItem key={dm.id} value={String(dm.id)}>
-                        {dm.ten}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
-                  Địa điểm (tỉnh/thành)
-                </label>
-                <Select
-                  value={form.dia_diem || ""}
-                  onValueChange={(v) => setForm({ ...form, dia_diem: v })}
-                >
-                  <SelectTrigger className="bg-gray-100 dark:bg-slate-800">
-                    <SelectValue placeholder="Chọn địa điểm (tỉnh/thành)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {provinces.map((p) => (
-                      <SelectItem key={p.code} value={p.name}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
-                  Ngày bắt đầu
-                </label>
-                <Input
-  type="date"
-  value={form.ngay_bat_dau || ""}
-  onChange={(e) => setForm({ ...form, ngay_bat_dau: e.target.value })}
-  className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 [color-scheme:light]"
-/>
-
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
-                  Ngày kết thúc
-                </label>
-                <Input
-  type="date"
-  value={form.ngay_ket_thuc || ""}
-  onChange={(e) => setForm({ ...form, ngay_ket_thuc: e.target.value })}
-  className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 [color-scheme:light]"
-/>
-
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
-                Mô tả dự án
-              </label>
-              <Textarea
-                rows={4}
-                placeholder="Nhập mô tả ngắn gọn về dự án"
-                className="bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                value={form.mo_ta || ""}
-                onChange={(e) => setForm({ ...form, mo_ta: e.target.value })}
-              />
-            </div>
-
-            <div className="mt-5">
-              <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
-                Ảnh đại diện
-              </label>
-              <Input type="file" onChange={handleFileChange} />
-              {form.anh_dai_dien && (
-                <img
-                  src={form.anh_dai_dien}
-                  alt="preview"
-                  className="w-32 h-32 object-cover rounded-md mt-2 border"
-                />
-              )}
-            </div>
-
-            <div className="mt-5">
-              <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
-                Thư viện ảnh (mô tả chi tiết)
-              </label>
-              <Input type="file" multiple onChange={handleGalleryChange} />
-              <div className="flex flex-wrap gap-2 mt-2">
-                {(form.thu_vien_anh || []).map((url, i) => (
-                  <div key={i} className="relative group">
-                    <img
-                      src={url}
-                      className="w-20 h-20 object-cover rounded-md border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeGalleryImage(i)}
-                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs opacity-0 group-hover:opacity-100 transition"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <Button variant="outline" onClick={() => setShowForm(false)}>
-                Hủy
-              </Button>
-              <Button onClick={handleSave} disabled={uploading || thuVienAnhUploading}>
-                {editing ? "Cập nhật" : "Lưu"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
