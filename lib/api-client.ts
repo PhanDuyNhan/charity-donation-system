@@ -268,17 +268,17 @@ export class ApiClient {
 
   static async createQuyenGop(data: Partial<QuyenGop>): Promise<QuyenGop> {
     const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
-    return this.post<QuyenGop>(ep, data)
+    return this.patch<QuyenGop>(ep, data)
   }
 
   static async updateQuyenGop(id: number, data: Partial<QuyenGop>): Promise<QuyenGop> {
     const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
-    return this.put<QuyenGop>(`${ep}/${id}`, data)
+    return this.patch<QuyenGop>(`${ep}?id=eq.${id}`, data)
   }
 
   static async deleteQuyenGop(id: number): Promise<void> {
     const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
-    return this.delete<void>(`${ep}/${id}`)
+    return this.delete<void>(`${ep}?id=eq.${id}`)
   }
 
   // ==================== TÌNH NGUYỆN VIÊN ====================
