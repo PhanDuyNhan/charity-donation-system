@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Edit2, Trash2, Search } from "lucide-react"
+import { Plus, Edit2, Trash2, Search, Calendar as CalendarIcon, XCircle } from "lucide-react"
 import {
   Pagination,
   PaginationContent,
@@ -17,28 +17,42 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { format } from "date-fns"
+import { vi } from "date-fns/locale"
+
+// ✅ Hàm loại bỏ dấu tiếng Việt để tìm kiếm không dấu
+function removeVietnameseTones(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+}
 
 export default function AdminDuAnPage() {
   const router = useRouter()
   const ALL_VALUE = "__all"
 
-  // dữ liệu
   const [duAns, setDuAns] = useState<DuAn[]>([])
   const [loading, setLoading] = useState(false)
 
-  // filters
   const [search, setSearch] = useState("")
   const [categoryId, setCategoryId] = useState<number | undefined>(undefined)
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined)
   const [month, setMonth] = useState<string>("__all")
   const [year, setYear] = useState<string>("__all")
 
-  // pagination
+  const [startDate, setStartDate] = useState<Date | undefined>()
+  const [endDate, setEndDate] = useState<Date | undefined>()
+
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 6
 
-  // danh muc
   const [danhMucs, setDanhMucs] = useState<DanhMucDuAn[]>([])
+  const [loadingDanhMuc, setLoadingDanhMuc] = useState(true)
 
   useEffect(() => {
     fetchAll()
@@ -48,12 +62,11 @@ export default function AdminDuAnPage() {
   async function fetchAll() {
     setLoading(true)
     try {
-      // apiClient.getDuAn() theo api-client.ts
       const res = await apiClient.getDuAn()
       setDuAns(Array.isArray(res) ? res : [])
     } catch (err) {
       console.error("Lỗi khi lấy dự án:", err)
-      alert("Lấy danh sách dự án thất bại. Kiểm tra console.")
+      alert("Không thể lấy danh sách dự án.")
     } finally {
       setLoading(false)
     }
@@ -65,6 +78,8 @@ export default function AdminDuAnPage() {
       setDanhMucs(Array.isArray(res) ? res : [])
     } catch (err) {
       console.error("Lỗi khi lấy danh mục:", err)
+    } finally {
+      setLoadingDanhMuc(false)
     }
   }
 
@@ -80,42 +95,48 @@ export default function AdminDuAnPage() {
     const ok = confirm(`Bạn có chắc muốn xóa dự án: "${item.tieu_de}" không?`)
     if (!ok) return
     try {
-      // apiClient.deleteDuAn(id)
       await apiClient.deleteDuAn(Number(item.id))
       alert("Xóa thành công")
       fetchAll()
     } catch (err) {
       console.error("Xóa thất bại:", err)
-      alert("Xóa thất bại. Kiểm tra console.")
+      alert("Xóa thất bại.")
     }
   }
 
-  // helper lấy tên danh mục từ danhMucs
-  function getCategoryName(ma: any) {
-    if (ma === undefined || ma === null) return ""
-    const id = Number(ma)
-    const found = danhMucs.find((d) => Number((d as any).id) === id)
-    return found ? (found as any).ten ?? (found as any).name ?? String(id) : String(id)
+  function getCategoryName(ma: number) {
+    const found = danhMucs.find((d) => Number(d.id) === Number(ma))
+    return found ? found.ten : "—"
   }
 
-  // filter logic
+  // ✅ Tìm kiếm nâng cao: không dấu, không phân biệt hoa/thường, nhiều từ
   const filtered = duAns
-    .filter((d) => (search ? (d.tieu_de ?? "").toLowerCase().includes(search.toLowerCase()) : true))
+    .filter((d) => {
+      if (!search) return true
+      const text = removeVietnameseTones(d.tieu_de || "")
+      const query = removeVietnameseTones(search)
+      return query.split(" ").every((word) => text.includes(word))
+    })
     .filter((d) => (categoryId ? Number(d.ma_danh_muc) === categoryId : true))
     .filter((d) => (statusFilter ? String(d.trang_thai) === statusFilter : true))
     .filter((d) => {
       if (month === "__all" && year === "__all") return true
-      const startDate = d.ngay_bat_dau ? new Date(d.ngay_bat_dau) : null
-      const monthMatch = month === "__all" || (startDate ? startDate.getMonth() + 1 === Number(month) : false)
-      const yearMatch = year === "__all" || (startDate ? startDate.getFullYear() === Number(year) : false)
+      const startDateObj = d.ngay_bat_dau ? new Date(d.ngay_bat_dau) : null
+      const monthMatch = month === "__all" || (startDateObj && startDateObj.getMonth() + 1 === Number(month))
+      const yearMatch = year === "__all" || (startDateObj && startDateObj.getFullYear() === Number(year))
       return monthMatch && yearMatch
     })
+    .filter((d) => {
+      const projectStart = new Date(d.ngay_bat_dau)
+      const projectEnd = new Date(d.ngay_ket_thuc)
+      if (startDate && projectStart < startDate) return false
+      if (endDate && projectEnd > endDate) return false
+      return true
+    })
 
-  // pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage))
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
-  // stats
   const stats = {
     total: duAns.length,
     hoat_dong: duAns.filter((d) => d.trang_thai === "hoat_dong").length,
@@ -126,63 +147,87 @@ export default function AdminDuAnPage() {
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalPages])
+
+  function resetFilters() {
+    setSearch("")
+    setCategoryId(undefined)
+    setStatusFilter(undefined)
+    setMonth("__all")
+    setYear("__all")
+    setStartDate(undefined)
+    setEndDate(undefined)
+    setCurrentPage(1)
+  }
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Quản lý Dự Án</h1>
+
       {/* Thống kê */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Tổng dự án</p>
-            <p className="text-sm font-medium">{stats.total}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Hoạt động</p>
-            <p className="text-lg font-medium">{stats.hoat_dong}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Tạm dừng</p>
-            <p className="text-lg font-medium">{stats.tam_dung}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Hoàn thành</p>
-            <p className="text-lg font-medium">{stats.hoan_thanh}</p>
-          </CardContent>
-        </Card>
+        {[
+          ["Tổng dự án", stats.total],
+          ["Hoạt động", stats.hoat_dong],
+          ["Tạm dừng", stats.tam_dung],
+          ["Hoàn thành", stats.hoan_thanh],
+        ].map(([label, val]) => (
+          <Card key={label}>
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">{label}</p>
+              <p className="text-lg font-medium">{val as string}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Bộ lọc */}
       <Card>
-        <CardHeader><CardTitle className="text-base font-semibold">Tìm kiếm & bộ lọc</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Tìm kiếm & bộ lọc</CardTitle>
+        </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3 items-center">
             <div className="flex items-center gap-2">
               <Search size={16} />
-              <Input className="text-sm" placeholder="Tìm theo tiêu đề" value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} />
+              <Input
+                className="text-sm"
+                placeholder="Tìm theo tiêu đề (viết không dấu, nhiều từ)"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setCurrentPage(1)
+                }}
+              />
             </div>
 
             {/* Danh mục */}
-            <Select onValueChange={(v) => { setCategoryId(v && v !== ALL_VALUE ? Number(v) : undefined); setCurrentPage(1); }}>
+            <Select
+              onValueChange={(v) => {
+                setCategoryId(v && v !== ALL_VALUE ? Number(v) : undefined)
+                setCurrentPage(1)
+              }}
+            >
               <SelectTrigger className="min-w-[160px] text-sm">
-                <SelectValue placeholder="Danh mục" />
+                <SelectValue placeholder={loadingDanhMuc ? "Đang tải danh mục..." : "Danh mục"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_VALUE}>Tất cả</SelectItem>
-                {danhMucs.map((dm) => <SelectItem key={(dm as any).id} value={String((dm as any).id)}>{(dm as any).ten ?? (dm as any).name}</SelectItem>)}
+                {danhMucs.map((dm) => (
+                  <SelectItem key={dm.id} value={String(dm.id)}>
+                    {dm.ten}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
             {/* Trạng thái */}
-            <Select onValueChange={(v) => { setStatusFilter(v && v !== ALL_VALUE ? v : undefined); setCurrentPage(1); }}>
+            <Select
+              onValueChange={(v) => {
+                setStatusFilter(v && v !== ALL_VALUE ? v : undefined)
+                setCurrentPage(1)
+              }}
+            >
               <SelectTrigger className="min-w-[140px] text-sm">
                 <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
@@ -195,43 +240,55 @@ export default function AdminDuAnPage() {
               </SelectContent>
             </Select>
 
-            {/* Tháng */}
-            <Select onValueChange={(v) => { setMonth(v); setCurrentPage(1); }}>
-              <SelectTrigger className="w-[110px] text-sm">
-                <SelectValue placeholder="Tháng" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all">Tất cả</SelectItem>
-                {[...Array(12)].map((_, i) => (
-                  <SelectItem key={i + 1} value={String(i + 1)}>Tháng {i + 1}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Lọc theo ngày */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="text-sm w-[150px] justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {startDate ? format(startDate, "dd/MM/yyyy", { locale: vi }) : "Ngày bắt đầu"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="p-0">
+                <Calendar mode="single" selected={startDate} onSelect={setStartDate} locale={vi} />
+              </PopoverContent>
+            </Popover>
 
-            {/* Năm */}
-            <Select onValueChange={(v) => { setYear(v); setCurrentPage(1); }}>
-              <SelectTrigger className="w-[110px] text-sm">
-                <SelectValue placeholder="Năm" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all">Tất cả</SelectItem>
-                {[2022, 2023, 2024, 2025].map((y) => (
-                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="text-sm w-[150px] justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {endDate ? format(endDate, "dd/MM/yyyy", { locale: vi }) : "Ngày kết thúc"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="p-0">
+                <Calendar mode="single" selected={endDate} onSelect={setEndDate} locale={vi} />
+              </PopoverContent>
+            </Popover>
 
             <div className="flex-1" />
-            <Button className="text-sm" onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />Thêm dự án
+            <Button
+              variant="secondary"
+              className="text-sm flex items-center gap-1"
+              onClick={resetFilters}
+            >
+              <XCircle className="h-4 w-4" /> Xóa bộ lọc
             </Button>
+            
           </div>
         </CardContent>
       </Card>
 
       {/* Danh sách */}
       <Card>
-        <CardHeader><CardTitle className="text-base font-semibold">Danh sách dự án ({filtered.length})</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+  <CardTitle className="text-base font-semibold">
+    Danh sách dự án ({filtered.length} kết quả)
+  </CardTitle>
+  <Button className="text-sm" onClick={openCreate}>
+    <Plus className="mr-2 h-4 w-4" /> Thêm dự án
+  </Button>
+</CardHeader>
+
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full table-auto">
@@ -239,32 +296,39 @@ export default function AdminDuAnPage() {
                 <tr className="text-left text-sm text-muted-foreground border-b">
                   <th className="py-2">Tiêu đề</th>
                   <th className="py-2">Danh mục</th>
+                  <th className="py-2">Ngày bắt đầu</th>
+                  <th className="py-2">Ngày kết thúc</th>
                   <th className="py-2">Mục tiêu</th>
-                  <th className="py-2">Địa điểm</th>
                   <th className="py-2">Trạng thái</th>
                   <th className="py-2">Hành động</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className="py-6 text-center text-sm">Đang tải...</td></tr>
+                  <tr><td colSpan={7} className="py-6 text-center text-sm">Đang tải...</td></tr>
                 ) : paginated.length === 0 ? (
-                  <tr><td colSpan={6} className="py-6 text-center text-sm">Không có dự án</td></tr>
+                  <tr><td colSpan={7} className="py-6 text-center text-sm">Không có dự án</td></tr>
                 ) : (
                   paginated.map((d) => (
                     <tr key={d.id} className="border-b text-sm">
                       <td className="py-2">{d.tieu_de}</td>
                       <td className="py-2">{getCategoryName(d.ma_danh_muc)}</td>
+                      <td className="py-2">{d.ngay_bat_dau}</td>
+                      <td className="py-2">{d.ngay_ket_thuc}</td>
                       <td className="py-2">{Number(d.so_tien_muc_tieu || 0).toLocaleString()}</td>
-                      <td className="py-2">{d.dia_diem}</td>
                       <td className="py-2">{d.trang_thai}</td>
                       <td className="py-2">
                         <div className="flex items-center gap-2">
                           <Button size="sm" className="text-xs" onClick={() => openEdit(d)}>
-                            <Edit2 className="mr-1 h-3.5 w-3.5" />Sửa
+                            <Edit2 className="mr-1 h-3.5 w-3.5" /> Sửa
                           </Button>
-                          <Button size="sm" variant="destructive" className="text-xs" onClick={() => handleDelete(d)}>
-                            <Trash2 className="mr-1 h-3.5 w-3.5" />Xóa
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="text-xs"
+                            onClick={() => handleDelete(d)}
+                          >
+                            <Trash2 className="mr-1 h-3.5 w-3.5" /> Xóa
                           </Button>
                         </div>
                       </td>

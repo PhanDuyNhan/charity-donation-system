@@ -194,13 +194,49 @@ export default function ThemDuAnMoiPage() {
             </div>
 
             {/* Ảnh đại diện */}
+            {/* Ảnh đại diện */}
             <div className="space-y-2">
               <Label>Ảnh đại diện (URL)</Label>
-              <Input
-                placeholder="https://example.com/image.jpg"
-                value={formData.anh_dai_dien}
-                onChange={(e) => setFormData({ ...formData, anh_dai_dien: e.target.value })}
-              />
+
+              <div className="flex gap-2">
+                <Input
+                  className="flex-1"
+                  value={formData.anh_dai_dien || ""}
+                  onChange={(e) => setFormData({ ...formData, anh_dai_dien: e.target.value })}
+                  placeholder="Dán URL hoặc tải ảnh"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => document.getElementById("avatarUploadInput")?.click()}
+                >
+                  Tải ảnh
+                </Button>
+                <input
+                  id="avatarUploadInput"
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      try {
+                        const res = await apiClient.uploadFile(file)
+                        const url = res.url || res.path
+                        if (url) {
+                          setFormData({ ...formData, anh_dai_dien: url })
+                        } else {
+                          alert("Không nhận được URL ảnh sau khi tải lên.")
+                        }
+                      } catch (err) {
+                        console.error("Lỗi tải ảnh đại diện:", err)
+                        alert("Tải ảnh thất bại.")
+                      }
+                    }
+                  }}
+                />
+              </div>
+
               {formData.anh_dai_dien && (
                 <img
                   src={formData.anh_dai_dien}
@@ -210,24 +246,85 @@ export default function ThemDuAnMoiPage() {
               )}
             </div>
 
-            {/* Trạng thái */}
+            {/* Thư viện ảnh */}
             <div className="space-y-2">
-              <Label>Trạng thái</Label>
-              <Select
-                value={formData.trang_thai}
-                onValueChange={(v) =>
-                  setFormData({ ...formData, trang_thai: v as TrangThaiDuAn })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="hoat_dong">Hoạt động</SelectItem>
-                  <SelectItem value="tam_dung">Tạm dừng</SelectItem>
-                  <SelectItem value="hoan_thanh">Hoàn thành</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Thư viện ảnh</Label>
+              <div className="flex flex-wrap gap-3">
+                {formData.thu_vien_anh?.map((url, idx) => (
+                  <div key={idx} className="relative group">
+                    <img
+                      src={url}
+                      alt={`Ảnh ${idx + 1}`}
+                      className="w-32 h-32 object-cover rounded-md border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          thu_vien_anh: formData.thu_vien_anh.filter((_, i) => i !== idx),
+                        })
+                      }
+                      className="absolute top-1 right-1 bg-black bg-opacity-50 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Thêm ảnh bằng URL */}
+              <div className="flex gap-2 mt-2">
+                <Input
+                  placeholder="Dán URL ảnh..."
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && e.currentTarget.value.trim()) {
+                      e.preventDefault()
+                      setFormData({
+                        ...formData,
+                        thu_vien_anh: [
+                          ...(formData.thu_vien_anh || []),
+                          e.currentTarget.value.trim(),
+                        ],
+                      })
+                      e.currentTarget.value = ""
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    document.getElementById("uploadInput")?.click()
+                  }
+                >
+                  Tải ảnh
+                </Button>
+                <input
+                  id="uploadInput"
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      try {
+                        const res = await apiClient.uploadFile(file)
+                        const url = res.url || res.path
+                        if (url) {
+                          setFormData({
+                            ...formData,
+                            thu_vien_anh: [...(formData.thu_vien_anh || []), url],
+                          })
+                        }
+                      } catch (err) {
+                        console.error("Lỗi upload ảnh:", err)
+                        alert("Tải ảnh thất bại.")
+                      }
+                    }
+                  }}
+                />
+              </div>
             </div>
 
             {/* Nút hành động */}
