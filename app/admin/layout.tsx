@@ -25,9 +25,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter()
   const { user, logout } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isChecking, setIsChecking] = useState(true) // ✅ chờ load Zustand
+  const [isChecking, setIsChecking] = useState(true)
 
-  // Kiểm tra quyền admin
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!user) {
@@ -41,7 +40,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => clearTimeout(timer)
   }, [user, router])
 
-  // Hiển thị màn hình chờ trong khi kiểm tra đăng nhập
   if (isChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 text-gray-600 text-sm">
@@ -58,7 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const menuItems = [
     { icon: LayoutDashboard, label: "Tổng Quan", href: "/admin" },
     { icon: FolderKanban, label: "Quản Lý Dự Án", href: "/admin/du-an" },
-    {icon: FolderKanban, label: "Quản Lý Danh Mục", href: "/admin/danh-muc-du-an" },
+    { icon: FolderKanban, label: "Quản Lý Danh Mục", href: "/admin/danh-muc-du-an" },
     { icon: DollarSign, label: "Quản Lý Quyên Góp", href: "/admin/quyen-gop" },
     { icon: Users, label: "Quản Lý Người Dùng", href: "/admin/nguoi-dung" },
     { icon: Users, label: "Tình Nguyện Viên", href: "/admin/tinh-nguyen-vien" },
@@ -79,7 +77,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="flex h-16 items-center justify-between border-b border-(--color-admin-border) px-6">
             <Link href="/admin" className="flex items-center gap-2">
               <Heart className="h-6 w-6 text-(--color-primary) fill-(--color-primary)" />
-              <span className="font-bold text-(--color-admin-text)">Admin Panel</span>
+              <span className="font-bold text-(--color-admin-text)">Quản trị viên</span>
             </Link>
             <Button
               variant="ghost"
@@ -153,15 +151,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="flex-1">
             <h1 className="text-lg font-semibold text-(--color-admin-text)">Hệ Thống Quản Trị</h1>
           </div>
-          <Link href="/" target="_blank">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-(--color-admin-border) text-(--color-admin-text-secondary) bg-transparent"
-            >
-              Xem Trang Chủ
-            </Button>
-          </Link>
         </header>
 
         {/* Page Content */}
