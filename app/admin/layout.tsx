@@ -154,7 +154,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Page Content */}
-        <main className="p-6">{children}</main>
+        <main className="p-0">{children}</main>
       </div>
 
       {/* Mobile Overlay */}
