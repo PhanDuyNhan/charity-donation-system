@@ -28,14 +28,10 @@ export interface NguoiDung {
   ho: string;
   so_dien_thoai?: string | null;
   dia_chi?: string | null;
-  ngay_sinh?: string | null;
   vai_tro: VaiTroNguoiDung;
   trang_thai?: TrangThaiNguoiDung | string;
-  email_da_xac_thuc?: boolean;
-  thoi_gian_xac_thuc_email?: string | null;
   token_ghi_nho?: string | null;
   ngay_tao?: string;
-  ngay_cap_nhat?: string;
 }
 
 export interface DanhMucDuAn {

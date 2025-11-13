@@ -5,7 +5,7 @@ import { useParams } from "next/navigation"
 import { apiClient } from "@/lib/api-client"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { Calendar, MapPin, Users, PiggyBank } from "lucide-react"
+import { Calendar, MapPin, Users, PiggyBank, ChevronLeft, ChevronRight, X } from "lucide-react"
 import { DonationForm } from "@/components/donation-form"
 import { ProjectGallery } from "@/components/project-gallery"
 import { ProjectCard } from "@/components/project-card"
@@ -16,7 +16,10 @@ export default function ProjectDetailPage() {
   const [relatedProjects, setRelatedProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [showGallery, setShowGallery] = useState(false)
+  const [currentImage, setCurrentImage] = useState(0)
 
+  // ====== Load dữ liệu dự án ======
   useEffect(() => {
     const loadProjectAndRelated = async () => {
       try {
@@ -25,14 +28,12 @@ export default function ProjectDetailPage() {
           const duAn = res[0]
           setProject(duAn)
 
-          // ✅ Lấy toàn bộ dự án khác, sau đó chọn ngẫu nhiên 3 dự án
+          // Lấy các dự án khác (3 ngẫu nhiên)
           const allProjects = await apiClient.getDuAn({
             id: `neq.${duAn.id}`,
           })
-
           const shuffled = allProjects.sort(() => 0.5 - Math.random())
-          const randomThree = shuffled.slice(0, 3)
-          setRelatedProjects(randomThree)
+          setRelatedProjects(shuffled.slice(0, 3))
         } else {
           setError("Không tìm thấy dự án.")
         }
@@ -46,10 +47,12 @@ export default function ProjectDetailPage() {
     loadProjectAndRelated()
   }, [id])
 
-  if (loading) return <div className="text-center py-20 text-gray-500">Đang tải dữ liệu...</div>
+  if (loading)
+    return <div className="text-center py-20 text-gray-500">Đang tải dữ liệu...</div>
   if (error) return <div className="text-center py-20 text-red-500">{error}</div>
   if (!project) return null
 
+  // ====== Xử lý ảnh ======
   const anhDaiDien = project.anh_dai_dien?.startsWith("https")
     ? project.anh_dai_dien
     : `https://j2ee.oshi.id.vn${project.anh_dai_dien}`
@@ -76,14 +79,34 @@ export default function ProjectDetailPage() {
       ? (project.so_tien_hien_tai / project.so_tien_muc_tieu) * 100
       : 0
 
+  // ====== Điều hướng ảnh trong popup ======
+  const handleNext = () => {
+    setCurrentImage((prev) => (prev + 1) % thuVienAnh.length)
+  }
+
+  const handlePrev = () => {
+    setCurrentImage((prev) => (prev - 1 + thuVienAnh.length) % thuVienAnh.length)
+  }
+
+  const openGallery = (index: number) => {
+    setCurrentImage(index)
+    setShowGallery(true)
+  }
+
+  const closeGallery = () => setShowGallery(false)
+
   return (
     <div className="min-h-screen bg-background">
       {/* ============ Hero ============ */}
       <section className="relative h-60 md:h-72 overflow-hidden">
         <img src={anhDaiDien} alt={project.tieu_de} className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-center px-3">
-          <h1 className="text-2xl md:text-4xl font-bold text-white mb-1">{project.tieu_de}</h1>
-          <p className="text-white/90 text-sm md:text-base max-w-xl">{project.mo_ta_ngan}</p>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent flex flex-col items-center justify-center text-center px-3">
+          <h1 className="text-2xl md:text-4xl font-bold text-white mb-1 drop-shadow-md">
+            {project.tieu_de}
+          </h1>
+          <p className="text-white/90 text-sm md:text-base max-w-xl drop-shadow-sm">
+            {project.mo_ta_ngan}
+          </p>
           <Badge className="mt-2 bg-accent text-accent-foreground uppercase shadow-md">
             {project.trang_thai === "hoat_dong" ? "Đang hoạt động" : "Đã kết thúc"}
           </Badge>
@@ -94,10 +117,100 @@ export default function ProjectDetailPage() {
       <section className="py-10 container mx-auto px-4 grid md:grid-cols-3 gap-8">
         {/* Bên trái */}
         <div className="md:col-span-2 space-y-6">
-          <Card className="overflow-hidden shadow-lg">
-            <img src={anhDaiDien} alt={project.tieu_de} className="w-full h-72 object-cover" />
-          </Card>
+          {/* === Bộ sưu tập ảnh === */}
+          {thuVienAnh.length > 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                {/* Ảnh lớn bên trái */}
+                <div className="col-span-2">
+                  <img
+                    src={thuVienAnh[0]}
+                    alt="Ảnh chính"
+                    className="w-full h-80 object-cover rounded-2xl shadow-md hover:scale-[1.02] transition-transform duration-300 cursor-pointer"
+                    onClick={() => openGallery(0)}
+                  />
+                </div>
 
+                {/* Hai ảnh nhỏ bên phải */}
+                <div className="flex flex-col gap-3">
+                  {thuVienAnh.slice(1, 3).map((img, i) => (
+                    <img
+                      key={i}
+                      src={img}
+                      alt={`Ảnh phụ ${i + 1}`}
+                      className="w-full h-[9.75rem] object-cover rounded-2xl shadow-md hover:scale-[1.02] transition-transform duration-300 cursor-pointer"
+                      onClick={() => openGallery(i + 1)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Nếu còn nhiều ảnh hơn */}
+              {thuVienAnh.length > 3 && (
+                <div className="text-center mt-2">
+                  <button
+                    onClick={() => openGallery(3)}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Xem thêm {thuVienAnh.length - 3} ảnh khác →
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Card className="overflow-hidden shadow-lg">
+              <img src={anhDaiDien} alt={project.tieu_de} className="w-full h-72 object-cover" />
+            </Card>
+          )}
+
+          {/* ==== Lightbox popup ==== */}
+          {showGallery && thuVienAnh.length > 0 && (
+            <div
+              className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 animate-fade-in"
+              onClick={closeGallery}
+            >
+              <div
+                className="relative w-[90vw] h-[80vh] flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Ảnh hiển thị */}
+                <img
+                  key={currentImage}
+                  src={thuVienAnh[currentImage]}
+                  alt={`Ảnh ${currentImage + 1}`}
+                  className="max-h-[80vh] max-w-[90vw] rounded-xl object-contain transition-transform duration-500 ease-in-out scale-105 hover:scale-110 shadow-lg"
+                />
+
+                {/* Nút đóng */}
+                <button
+                  onClick={closeGallery}
+                  className="absolute top-3 right-3 bg-white/20 text-white rounded-full p-2 hover:bg-white/40 transition"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+
+                {/* Nút chuyển ảnh */}
+                {thuVienAnh.length > 1 && (
+                  <>
+                    <button
+                      onClick={handlePrev}
+                      className="absolute left-5 bg-white/20 text-white rounded-full p-2 hover:bg-white/40 transition"
+                    >
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+                    <button
+                      onClick={handleNext}
+                      className="absolute right-5 bg-white/20 text-white rounded-full p-2 hover:bg-white/40 transition"
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* === Thông tin chi tiết === */}
           <Card>
             <CardContent className="p-5 space-y-3">
               <h2 className="text-xl font-bold text-foreground">Giới thiệu dự án</h2>
@@ -119,13 +232,6 @@ export default function ProjectDetailPage() {
               </div>
             </CardContent>
           </Card>
-
-          {thuVienAnh.length > 0 && (
-            <div>
-              <h2 className="text-lg font-semibold mb-3">Thư viện ảnh</h2>
-              <ProjectGallery images={thuVienAnh} projectTitle={project.tieu_de} />
-            </div>
-          )}
         </div>
 
         {/* Bên phải */}
@@ -162,15 +268,14 @@ export default function ProjectDetailPage() {
       {/* ============ Dự án tương tự ============ */}
       <section className="bg-muted/30 py-12 animate-fade-in">
         <div className="container mx-auto px-4">
-          <h2 className="text-2xl font-bold mb-8 text-center text-foreground">Các dự án tương tự</h2>
+          <h2 className="text-2xl font-bold mb-8 text-center text-foreground">
+            Các dự án tương tự
+          </h2>
 
           {relatedProjects.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {relatedProjects.map((p) => (
-                <div
-                  key={p.id}
-                  className="transition-transform hover:scale-[1.02] duration-300"
-                >
+                <div key={p.id} className="transition-transform hover:scale-[1.02] duration-300">
                   <ProjectCard project={p} />
                 </div>
               ))}

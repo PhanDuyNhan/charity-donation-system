@@ -79,7 +79,6 @@ export default function AdminNguoiDungPage() {
     }
   }
 
-  // Bộ lọc
   const filtered = nguoiDungs
     .filter((n) => {
       if (!search) return true
@@ -119,7 +118,7 @@ export default function AdminNguoiDungPage() {
             <Button onClick={openCreate} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg">
               <Plus className="h-4 w-4" /> Thêm người dùng
             </Button>
-            <Button variant="ghost" className="border border-neutral-700 text-neutral-200" onClick={fetchNguoiDung}>
+            <Button variant="ghost" className="border border-neutral-700 text-neutral-200 hover:bg-[#1f2937]" onClick={fetchNguoiDung}>
               Tải lại
             </Button>
           </div>
@@ -134,20 +133,22 @@ export default function AdminNguoiDungPage() {
             "Biên tập viên": stats.bien_tap_vien,
             "Người dùng": stats.nguoi_dung,
           }).map(([label, value]) => (
-            <Card key={label} className="bg-[#0f1724] border border-neutral-700">
-              <CardContent className="p-4 text-center">
+            <Card key={label} className="admin-card bg-[#0f1724] border border-neutral-700 shadow-md hover:shadow-lg transition-all duration-200">
+              <CardContent className="p-5 text-center">
                 <p className="text-sm text-neutral-400">{label}</p>
-                <p className="text-xl font-bold text-white mt-1">{value}</p>
+                <p className="text-2xl font-bold text-white mt-2">{value}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
         {/* Bộ lọc */}
-        <Card className="bg-[#0f1724] border border-neutral-700">
+        <Card className="admin-card bg-[#0f1724] border border-neutral-700 shadow-md">
           <CardHeader>
-            <CardTitle className="text-lg">Tìm kiếm & Bộ lọc người dùng</CardTitle>
-            <CardDescription className="text-neutral-400">Tìm theo họ tên, email, số điện thoại, vai trò và trạng thái</CardDescription>
+            <CardTitle className="text-lg font-semibold">Tìm kiếm & Bộ lọc người dùng</CardTitle>
+            <CardDescription className="text-neutral-400">
+              Tìm theo họ tên, email, số điện thoại, vai trò và trạng thái
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3 items-center">
@@ -191,7 +192,7 @@ export default function AdminNguoiDungPage() {
               </Select>
 
               <div className="flex-1" />
-              <Button variant="secondary" className="text-sm flex items-center gap-1" onClick={resetFilters}>
+              <Button variant="secondary" className="text-sm flex items-center gap-1 hover:bg-[#1f2937]" onClick={resetFilters}>
                 <XCircle className="h-4 w-4" /> Xóa bộ lọc
               </Button>
             </div>
@@ -199,13 +200,13 @@ export default function AdminNguoiDungPage() {
         </Card>
 
         {/* Danh sách */}
-        <Card className="bg-[#0f1724] border border-neutral-700">
+        <Card className="admin-card bg-[#0f1724] border border-neutral-700 shadow-md">
           <CardHeader className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg">Danh sách người dùng</CardTitle>
+              <CardTitle className="text-lg font-semibold">Danh sách người dùng</CardTitle>
               <CardDescription className="text-neutral-400">{filtered.length} kết quả</CardDescription>
             </div>
-            <Button size="sm" variant="ghost" className="border border-neutral-700 text-neutral-200" onClick={fetchNguoiDung}>
+            <Button size="sm" variant="ghost" className="border border-neutral-700 text-neutral-200 hover:bg-[#1f2937]" onClick={fetchNguoiDung}>
               Tải lại
             </Button>
           </CardHeader>
@@ -220,7 +221,7 @@ export default function AdminNguoiDungPage() {
                     <th className="py-3 px-6">Số điện thoại</th>
                     <th className="py-3 px-6">Vai trò</th>
                     <th className="py-3 px-6">Trạng thái</th>
-                    <th className="py-3 px-6">Hành động</th>
+                    <th className="py-3 px-6 text-center">Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -230,18 +231,18 @@ export default function AdminNguoiDungPage() {
                     <tr><td colSpan={6} className="py-6 text-center text-sm text-neutral-400">Không có người dùng</td></tr>
                   ) : (
                     paginated.map((n) => (
-                      <tr key={n.id} className="border-b border-neutral-700 hover:bg-[#0b1220]">
+                      <tr key={n.id} className="border-b border-neutral-700 hover:bg-[#0b1220] transition-colors">
                         <td className="py-3 px-6">{`${n.ho} ${n.ten}`}</td>
                         <td className="py-3 px-6">{n.email}</td>
                         <td className="py-3 px-6">{n.so_dien_thoai ?? "-"}</td>
                         <td className="py-3 px-6 capitalize">{n.vai_tro.replaceAll("_", " ")}</td>
                         <td className="py-3 px-6">{n.trang_thai}</td>
-                        <td className="py-3 px-6">
-                          <div className="flex items-center gap-2">
-                            <Button size="sm" className="text-xs bg-[#0f1724] border border-neutral-700" onClick={() => openEdit(n)}>
+                        <td className="py-3 px-6 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <Button size="sm" className="text-xs bg-[#1f2937] border border-neutral-700 hover:bg-[#374151]" onClick={() => openEdit(n)}>
                               <Edit2 className="mr-1 h-3.5 w-3.5" /> Sửa
                             </Button>
-                            <Button size="sm" variant="destructive" className="text-xs" onClick={() => handleDelete(n)}>
+                            <Button size="sm" variant="destructive" className="text-xs hover:bg-red-700" onClick={() => handleDelete(n)}>
                               <Trash2 className="mr-1 h-3.5 w-3.5" /> Xóa
                             </Button>
                           </div>
@@ -253,7 +254,6 @@ export default function AdminNguoiDungPage() {
               </table>
             </div>
 
-            {/* Phân trang */}
             {totalPages > 1 && (
               <div className="mt-4 flex items-center justify-end px-6 py-4">
                 <Pagination>
