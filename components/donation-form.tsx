@@ -50,21 +50,6 @@ export function DonationForm({ projectId, projectName }: DonationFormProps) {
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Loại quyên góp</label>
-            <Select value={donationType} onValueChange={setDonationType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="one-time">Quyên góp một lần</SelectItem>
-                <SelectItem value="monthly">Quyên góp hàng tháng</SelectItem>
-                <SelectItem value="quarterly">Quyên góp hàng quý</SelectItem>
-                <SelectItem value="yearly">Quyên góp hàng năm</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
             <label className="block text-sm font-medium text-foreground mb-3">Chọn số tiền</label>
             <div className="grid grid-cols-2 gap-2 mb-3">
               {presetAmounts.map((preset) => (

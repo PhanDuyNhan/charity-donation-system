@@ -130,14 +130,15 @@ export class ApiClient {
   }
 
   // ==================== AUTH ====================
+  // NOTE: many backends expect { email, mat_khau } for login/register
   static async login(email: string, password: string): Promise<any> {
     const ep = getEndpoint("AUTH_LOGIN", "auth/login")
-    return this.post(ep, { email, password })
+    return this.post(ep, { email, password })  // ✔ gửi password đúng chuẩn BE
   }
 
   static async register(data: any): Promise<any> {
     const ep = getEndpoint("AUTH_REGISTER", "auth/register")
-    return this.post(ep, data)
+    return this.post(ep, data) 
   }
 
   // ==================== NGƯỜI DÙNG ====================
@@ -146,9 +147,10 @@ export class ApiClient {
     return this.get<NguoiDung[]>(ep, params)
   }
 
+  // CREATE should be POST (not PATCH) — sửa để tạo user đúng REST
   static async createNguoiDung(data: Partial<NguoiDung>): Promise<NguoiDung> {
     const ep = getEndpoint("NGUOI_DUNG", "nguoi_dung")
-    return this.patch<NguoiDung>(ep, data)
+    return this.post<NguoiDung>(ep, data)
   }
 
   static async updateNguoiDung(id: number, data: Partial<NguoiDung>): Promise<NguoiDung> {
@@ -171,17 +173,17 @@ export class ApiClient {
 
   static async createDuAn(data: Partial<DuAn>): Promise<DuAn> {
     const ep = getEndpoint("DU_AN", "du_an")
-    return this.patch<DuAn>(ep, data)
+    return this.post<DuAn>(ep, data)
   }
 
   static async updateDuAn(id: number, data: Partial<DuAn>): Promise<DuAn> {
     const ep = getEndpoint("DU_AN", "du_an")
-    return this.patch<DuAn>(`${ep}?id=eq.${id}`, data)
+    return this.put<DuAn>(`${ep}/${id}`, data)
   }
 
   static async deleteDuAn(id: number): Promise<void> {
     const ep = getEndpoint("DU_AN", "du_an")
-    return this.delete<void>(`${ep}?id=eq.${id}`)
+    return this.delete<void>(`${ep}/${id}`)
   }
 
 
@@ -268,17 +270,17 @@ export class ApiClient {
 
   static async createQuyenGop(data: Partial<QuyenGop>): Promise<QuyenGop> {
     const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
-    return this.patch<QuyenGop>(ep, data)
+    return this.post<QuyenGop>(ep, data)
   }
 
   static async updateQuyenGop(id: number, data: Partial<QuyenGop>): Promise<QuyenGop> {
     const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
-    return this.patch<QuyenGop>(`${ep}?id=eq.${id}`, data)
+    return this.put<QuyenGop>(`${ep}/${id}`, data)
   }
 
   static async deleteQuyenGop(id: number): Promise<void> {
     const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
-    return this.delete<void>(`${ep}?id=eq.${id}`)
+    return this.delete<void>(`${ep}/${id}`)
   }
 
   // ==================== TÌNH NGUYỆN VIÊN ====================

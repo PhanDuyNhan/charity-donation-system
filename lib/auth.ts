@@ -6,7 +6,6 @@ import type { NguoiDung } from "./types"
 import { apiClient } from "./api-client"
 import { API_CONFIG } from "./api-config"
 
-// =================== COOKIE HELPERS ===================
 function setCookie(name: string, value: string, days = 7) {
   const expires = new Date()
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
@@ -17,7 +16,6 @@ function deleteCookie(name: string) {
   document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/`
 }
 
-// =================== AUTH STORE ===================
 interface AuthState {
   user: NguoiDung | null
   token: string | null
@@ -59,20 +57,24 @@ export function isAdmin(user: NguoiDung | null): boolean {
   return user?.vai_tro === "quan_tri_vien" || user?.vai_tro === "dieu_hanh_vien"
 }
 
-export function isEditor(user: NguoiDung | null): boolean {
-  return user?.vai_tro === "bien_tap_vien" || isAdmin(user)
-}
-
 // =================== AUTH SERVICE ===================
 export const authService = {
   // ---- LOGIN ----
   async login(email: string, password: string) {
     try {
-      // ⚙️ Gọi API đúng format BE (đã có BASE_URL trong api-client)
-      const response: any = await apiClient.post(API_CONFIG.ENDPOINTS.AUTH_LOGIN, { email, password })
+      const response: any = await apiClient.login(email, password)
 
-      const user = response?.data?.userInfo
-      const token = response?.data?.accessToken
+      // BE có thể trả nhiều dạng khác nhau
+      const user =
+        response?.user ??
+        response?.data?.userInfo ??
+        response?.data?.user ??
+        response
+
+      const token =
+        response?.token ??
+        response?.data?.accessToken ??
+        response?.accessToken
 
       if (!user || !token) {
         throw new Error("Dữ liệu đăng nhập không hợp lệ")
@@ -81,7 +83,6 @@ export const authService = {
       useAuthStore.getState().login(user, token)
       return { user, token }
     } catch (error: any) {
-      console.error("❌ Lỗi đăng nhập:", error)
       throw new Error(error.message || "Đăng nhập thất bại")
     }
   },
@@ -92,39 +93,29 @@ export const authService = {
     ten: string
     email: string
     so_dien_thoai: string
-    password: string
+    password: string  // FE giữ nguyên
   }) {
     try {
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.AUTH_REGISTER, {
+      const payload = {
         email: data.email,
-        password: data.password,
+        password: data.password,  // ✔ BE yêu cầu password
         ten: data.ten,
         ho: data.ho,
         so_dien_thoai: data.so_dien_thoai,
-      })
-      return response
+      }
+
+      return await apiClient.register(payload)
     } catch (error) {
-      console.error("❌ Lỗi đăng ký:", error)
       throw error
     }
   },
 
-  // ---- LOGOUT ----
   logout() {
     useAuthStore.getState().logout()
   },
 
-  // ---- HELPERS ----
   getCurrentUser() {
     return useAuthStore.getState().user
-  },
-
-  getToken() {
-    return useAuthStore.getState().token
-  },
-
-  isAuthenticated() {
-    return useAuthStore.getState().isAuthenticated
   },
 }
 
