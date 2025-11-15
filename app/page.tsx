@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Heart, ArrowRight, HandHeart, Target, Shield } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { apiClient } from "@/lib/api-client"
+import ChatbotWidget from "@/components/ui/chatbox"
 export default function HomePage() {
   const { user, isAuthenticated, logout } = useAuth() // 👈 lấy state đăng nhập
   return (
@@ -131,6 +132,8 @@ export default function HomePage() {
             <p className="text-(--color-foreground-secondary) text-lg">Cam kết minh bạch và hiệu quả</p>
           </div>
 
+            <ChatbotWidget />
+
           <div className="grid md:grid-cols-3 gap-8">
             <Card className="text-center p-8 border-(--color-border) hover:border-(--color-primary) transition-colors">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-(--color-background-tertiary) mb-6">
@@ -164,7 +167,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-(--color-primary) to-(--color-success) text-white">
         <div className="container mx-auto px-4 text-center">

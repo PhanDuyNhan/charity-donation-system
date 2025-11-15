@@ -70,9 +70,9 @@ export const authService = {
     try {
       // ⚙️ Gọi API đúng format BE (đã có BASE_URL trong api-client)
       const response: any = await apiClient.post(API_CONFIG.ENDPOINTS.AUTH_LOGIN, { email, password })
-
-      const user = response?.data?.userInfo
-      const token = response?.data?.accessToken
+      console.log("responseeeeeeeee", response)
+      const user = response?.userInfo
+      const token = response?.accessToken
 
       if (!user || !token) {
         throw new Error("Dữ liệu đăng nhập không hợp lệ")

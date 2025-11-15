@@ -26,9 +26,11 @@ export default function DangNhapPage() {
 
     try {
       const { user } = await authService.login(email, password)
-
+      console.log("userrrrrrrrrrrrr", user.role)
       // Redirect based on role
+      console.log("notttttttttttttttttttttttttt")
       if (isAdmin(user)) {
+        console.log("2222222222222222222222222222222")
         router.push("/admin")
       } else {
         router.push("/")

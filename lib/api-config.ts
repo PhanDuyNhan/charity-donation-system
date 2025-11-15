@@ -1,5 +1,6 @@
 export const API_CONFIG = {
-  BASE_URL: "https://j2ee.oshi.id.vn/api/v1", // ✅ khớp CorsConfig backend
+  BASE_URL: "https://j2ee.oshi.id.vn:443/api/v1", // ✅ khớp CorsConfig backend
+  // BASE_URL: "http://localhost:5555/api/v1", // ✅ khớp CorsConfig backend
 
   ENDPOINTS: {
     AUTH_LOGIN: "auth/login",
