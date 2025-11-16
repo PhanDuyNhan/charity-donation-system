@@ -153,7 +153,7 @@ export class ApiClient {
 
   static async register(data: any): Promise<any> {
     const ep = getEndpoint("AUTH_REGISTER", "auth/register")
-    return this.post(ep, data)
+    return this.post(ep, data) 
   }
 
   // ==================== NGƯỜI DÙNG ====================
