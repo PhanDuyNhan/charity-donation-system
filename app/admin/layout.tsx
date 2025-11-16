@@ -26,7 +26,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, logout } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
-
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!user) {

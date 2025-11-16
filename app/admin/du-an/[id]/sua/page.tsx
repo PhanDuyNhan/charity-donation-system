@@ -19,7 +19,7 @@ export default function SuaDuAnPage() {
   const [formData, setFormData] = useState<any>(null)
   const [danhMucs, setDanhMucs] = useState<any[]>([])
   const [provinces, setProvinces] = useState<any[]>([])
-
+  console.log("2222222222222222222222222222")
   useEffect(() => {
     if (id) loadData()
   }, [id])

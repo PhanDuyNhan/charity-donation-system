@@ -7,7 +7,68 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Heart, ArrowRight, HandHeart, Target, Shield } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { apiClient } from "@/lib/api-client"
+import ChatbotWidget from "@/components/ui/chatbox"
+import { DuAn } from "@/lib/types"
 export default function HomePage() {
+  const [page, setPage] = useState(1)
+  const [projects, setProjects] = useState<DuAn[]>([])
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalProjects, setTotalProjects] = useState(0);
+  const pageSize = 3;
+
+  useEffect(() => {
+    let mounted = true;
+    async function fetchProjects() {
+      // Đảm bảo các state sau được khai báo: page, pageSize, setProjects, setTotalProjects, setIsLoading
+      setIsLoading(true);
+
+      try {
+        // Tính toán offset (vị trí bắt đầu)
+        const offset = (page - 1) * pageSize;
+
+        const res = await apiClient.getDuAn({
+          select: "*",
+          order: "id.desc",
+          limit: pageSize, // Tham số phân trang
+          offset: offset,  // Tham số phân trang
+        });
+
+        console.log("resssssssssssss", res)
+
+        // 2. Cập nhật danh sách dự án
+        if (mounted && Array.isArray(res)) {
+          setProjects(res);
+        }
+        // 3. Lấy tổng số dự án để tính toán phân trang
+        const countRes = await apiClient.getDuAn({ select: "id" });
+        if (mounted && Array.isArray(countRes)) {
+          setTotalProjects(countRes.length);
+        }
+
+      } catch (err) {
+        console.error("Failed to load projects", err);
+        if (mounted) setProjects([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchProjects();
+    return () => {
+      mounted = false;
+    };
+  }, [page, pageSize]); // Thêm pageSize vào dependencies
+  // Pagination controls
+  const totalPages = Math.ceil(totalProjects / pageSize);
+
+  function handlePrevPage() {
+    setPage((prev) => Math.max(1, prev - 1));
+  }
+  function handleNextPage() {
+    setPage((prev) => Math.min(totalPages, prev + 1));
+  }
+
+  console.log("object", projects)
+
   const { user, isAuthenticated, logout } = useAuth() // 👈 lấy state đăng nhập
   return (
     <div className="min-h-screen">
@@ -52,7 +113,7 @@ export default function HomePage() {
       {/* Stats Section */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
-          <StatsBlock />
+          {/* <StatsBlock /> */}
         </div>
       </section>
 
@@ -65,48 +126,124 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {[1, 2, 3].map((i) => (
-              <Card
-                key={i}
-                className="overflow-hidden hover:shadow-xl transition-shadow duration-300 border-(--color-border)"
-              >
-                <div className="relative h-48 overflow-hidden">
-                  <img
-                    src={`/charity-project-.jpg?height=200&width=400&query=charity project ${i}`}
-                    alt={`Dự án ${i}`}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute top-4 right-4 bg-(--color-secondary) text-white px-3 py-1 rounded-full text-sm font-semibold">
-                    Khẩn Cấp
+
+            {projects?.map((project: DuAn, key: number) => {
+
+              // Tính toán phần trăm quyên góp
+              const progressPercentage = calculatePercentage(
+                project.so_tien_hien_tai,
+                project.so_tien_muc_tieu
+              );
+
+              // Định dạng tiền tệ
+              const currentAmountFormatted = formatNumber(project.so_tien_hien_tai);
+              const targetAmountFormatted = formatNumber(project.so_tien_muc_tieu);
+
+              // Xác định mức độ khẩn cấp (ví dụ: ưu tiên > 7 là khẩn cấp)
+              const isUrgent = project.muc_do_uu_tien;
+
+              // Tách địa điểm (ví dụ: lấy tên địa điểm cuối cùng)
+              // Dữ liệu mẫu là "Xã Tả Van, Sapa, Lào Cai", ta lấy "Lào Cai"
+              const locationParts = project.dia_diem.split(',').map(s => s.trim());
+              const mainLocation = locationParts[locationParts.length - 1];
+
+              // Sử dụng thu_vien_anh, nếu không có thì dùng ảnh mặc định
+              const imageUrl = Array.isArray(project.thu_vien_anh)
+                ? project.thu_vien_anh[0] || '/default-project-image.jpg'
+                : project.thu_vien_anh || '/default-project-image.jpg';
+
+
+              return (
+                <Card
+                  key={project.id} // 💡 Sử dụng project.id làm key là tốt nhất
+                  className="overflow-hidden hover:shadow-xl transition-shadow duration-300 border-(--color-border)"
+                >
+                  <div className="relative h-48 overflow-hidden">
+                    <img
+                      src={imageUrl}
+                      alt={project.tieu_de}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                    />
+
+                    {/* HIỂN THỊ KHẨN CẤP DỰA TRÊN DỮ LIỆU */}
+                    {isUrgent && (
+                      <div className="absolute top-4 right-4 bg-(--color-secondary) text-white px-3 py-1 rounded-full text-sm font-semibold">
+                        Khẩn Cấp
+                      </div>
+                    )}
                   </div>
-                </div>
-                <CardHeader>
-                  <CardTitle className="text-xl text-balance">Xây Dựng Trường Học Vùng Cao</CardTitle>
-                  <CardDescription>Giáo dục • Lào Cai</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-(--color-foreground-secondary)">Đã quyên góp</span>
-                      <span className="font-semibold text-(--color-primary)">75%</span>
+
+                  <CardHeader>
+                    <CardTitle className="text-xl text-balance">{project?.tieu_de}</CardTitle>
+                    {/* HIỂN THỊ ĐỊA ĐIỂM THỰC TẾ (Giả định ma_danh_muc cần gọi thêm API khác) */}
+                    <CardDescription>
+                      {/* Giả định: Danh mục: Giáo dục | Địa điểm: Lào Cai */}
+                      {`Danh Mục ID: ${project.ma_danh_muc} • ${mainLocation}`}
+                    </CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      {/* TIẾN ĐỘ QUYÊN GÓP */}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-(--color-foreground-secondary)">Đã quyên góp</span>
+                        {/* SỬ DỤNG TIẾN ĐỘ TÍNH TOÁN */}
+                        <span className="font-semibold text-(--color-primary)">{progressPercentage}%</span>
+                      </div>
+
+                      {/* THANH TIẾN ĐỘ */}
+                      <div className="w-full bg-(--color-border) rounded-full h-2">
+                        {/* SỬ DỤNG TIẾN ĐỘ TÍNH TOÁN */}
+                        <div className="bg-(--color-primary) h-2 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
+                      </div>
+
+                      {/* SỐ TIỀN */}
+                      <div className="flex justify-between text-sm">
+                        {/* SỬ DỤNG TIỀN ĐỊNH DẠNG */}
+                        <span className="font-semibold">{currentAmountFormatted}</span>
+                        {/* SỬ DỤNG TIỀN ĐỊNH DẠNG */}
+                        <span className="text-(--color-foreground-secondary)">/ {targetAmountFormatted}</span>
+                      </div>
                     </div>
-                    <div className="w-full bg-(--color-border) rounded-full h-2">
-                      <div className="bg-(--color-primary) h-2 rounded-full" style={{ width: "75%" }}></div>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="font-semibold">750,000,000 đ</span>
-                      <span className="text-(--color-foreground-secondary)">/ 1,000,000,000 đ</span>
-                    </div>
-                  </div>
-                  <Link href={`/du-an/${i}`}>
-                    <Button className="w-full bg-(--color-primary) hover:bg-(--color-primary-hover)">
-                      Quyên Góp Ngay
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
+
+                    {/* LINK */}
+                    <Link href={`/du-an/${project.id}`}>
+                      <Button className="w-full bg-(--color-primary) hover:bg-(--color-primary-hover)">
+                        Quyên Góp Ngay
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-4 mt-8">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrevPage}
+                disabled={page === 1 || isLoading}
+                className="min-w-[40px]"
+              >
+                &lt;
+              </Button>
+              <span className="text-sm">
+                Trang <span className="font-semibold">{page}</span> / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={page === totalPages || isLoading}
+                className="min-w-[40px]"
+              >
+                &gt;
+              </Button>
+            </div>
+          )}
 
           <div className="text-center mt-12">
             <Link href="/du-an">
@@ -130,6 +267,8 @@ export default function HomePage() {
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-balance">Tại Sao Chọn Chúng Tôi?</h2>
             <p className="text-(--color-foreground-secondary) text-lg">Cam kết minh bạch và hiệu quả</p>
           </div>
+
+          <ChatbotWidget />
 
           <div className="grid md:grid-cols-3 gap-8">
             <Card className="text-center p-8 border-(--color-border) hover:border-(--color-primary) transition-colors">
@@ -164,7 +303,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-(--color-primary) to-(--color-success) text-white">
         <div className="container mx-auto px-4 text-center">
@@ -280,92 +418,99 @@ function formatNumber(n: number) {
   return String(n)
 }
 
-function StatsBlock() {
-  const [projectsCompleted, setProjectsCompleted] = useState<number | null>(null)
-  const [uniqueDonors, setUniqueDonors] = useState<number | null>(null)
-  const [volunteersCount, setVolunteersCount] = useState<number | null>(null)
-  const [totalDonations, setTotalDonations] = useState<number | null>(null)
+// function StatsBlock() {
+//   const [projectsCompleted, setProjectsCompleted] = useState<number | null>(null)
+//   const [uniqueDonors, setUniqueDonors] = useState<number | null>(null)
+//   const [volunteersCount, setVolunteersCount] = useState<number | null>(null)
+//   const [totalDonations, setTotalDonations] = useState<number | null>(null)
 
-  useEffect(() => {
-    let mounted = true
+//   useEffect(() => {
+//     let mounted = true
 
-    async function loadStats() {
-      try {
-        // 1) Projects completed
+//     async function loadStats() {
+//       try {
+//         // 1) Projects completed
 
-        // Using PostgREST-style filters (eq.) so queries match backend expectations
-        const projects = await apiClient.getDuAn({ trang_thai: "eq.hoan_thanh", select: "id" })
+//         // Using PostgREST-style filters (eq.) so queries match backend expectations
+//         const projects = await apiClient.getDuAn({ trang_thai: "eq.hoan_thanh", select: "id" })
 
-        // Donations: fetch all donors (for unique count) and completed donations (for sum)
-        const donationsAll = await apiClient.getQuyenGop({ select: "ma_nguoi_dung,email_nguoi_quyen_gop" })
-        const donationsCompleted = await apiClient.getQuyenGop({ select: "so_tien", trang_thai_thanh_toan: "eq.hoan_thanh" })
+//         // Donations: fetch all donors (for unique count) and completed donations (for sum)
+//         const donationsAll = await apiClient.getQuyenGop({ select: "ma_nguoi_dung,email_nguoi_quyen_gop" })
+//         const donationsCompleted = await apiClient.getQuyenGop({ select: "so_tien", trang_thai_thanh_toan: "eq.hoan_thanh" })
 
-        // Volunteers
-        const volunteers = await apiClient.getTinhNguyenVien({ select: "id,ma_nguoi_dung" })
+//         // Volunteers
+//         const volunteers = await apiClient.getTinhNguyenVien({ select: "id,ma_nguoi_dung" })
 
-        if (!mounted) return
+//         if (!mounted) return
 
-        setProjectsCompleted(Array.isArray(projects) ? projects.length : 0)
+//         setProjectsCompleted(Array.isArray(projects) ? projects.length : 0)
 
-        // compute unique donors from donationsAll
-        const donors = new Set<string | number>()
-        if (Array.isArray(donationsAll)) {
-          donationsAll.forEach((d: any) => {
-            const key = d.ma_nguoi_dung ?? d.email_nguoi_quyen_gop ?? JSON.stringify(d)
-            donors.add(key)
-          })
-        }
+//         // compute unique donors from donationsAll
+//         const donors = new Set<string | number>()
+//         if (Array.isArray(donationsAll)) {
+//           donationsAll.forEach((d: any) => {
+//             const key = d.ma_nguoi_dung ?? d.email_nguoi_quyen_gop ?? JSON.stringify(d)
+//             donors.add(key)
+//           })
+//         }
 
-        // sum amounts from completed donations
-        let sum = 0
-        if (Array.isArray(donationsCompleted)) {
-          donationsCompleted.forEach((d: any) => {
-            const amount = typeof d.so_tien === "number" ? d.so_tien : Number(d.so_tien) || 0
-            sum += amount
-          })
-        }
+//         // sum amounts from completed donations
+//         let sum = 0
+//         if (Array.isArray(donationsCompleted)) {
+//           donationsCompleted.forEach((d: any) => {
+//             const amount = typeof d.so_tien === "number" ? d.so_tien : Number(d.so_tien) || 0
+//             sum += amount
+//           })
+//         }
 
-        setUniqueDonors(donors.size)
-        setTotalDonations(sum)
-        setVolunteersCount(Array.isArray(volunteers) ? volunteers.length : 0)
-      } catch (err) {
-        console.error("Stats load failed", err)
-        if (mounted) {
-          setProjectsCompleted(0)
-          setUniqueDonors(0)
-          setVolunteersCount(0)
-          setTotalDonations(0)
-        }
-      }
-    }
+//         setUniqueDonors(donors.size)
+//         setTotalDonations(sum)
+//         setVolunteersCount(Array.isArray(volunteers) ? volunteers.length : 0)
+//       } catch (err) {
+//         console.error("Stats load failed", err)
+//         if (mounted) {
+//           setProjectsCompleted(0)
+//           setUniqueDonors(0)
+//           setVolunteersCount(0)
+//           setTotalDonations(0)
+//         }
+//       }
+//     }
 
-    loadStats()
-    return () => {
-      mounted = false
-    }
-  }, [])
+//     loadStats()
+//     return () => {
+//       mounted = false
+//     }
+//   }, [])
 
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-      <div className="text-center space-y-2">
-        <div className="text-4xl font-bold text-(--color-primary)">{projectsCompleted == null ? "—" : projectsCompleted.toLocaleString()}</div>
-        <div className="text-sm text-(--color-foreground-secondary)">Dự Án Hoàn Thành</div>
-      </div>
+//   return (
+//     <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+//       <div className="text-center space-y-2">
+//         <div className="text-4xl font-bold text-(--color-primary)">{projectsCompleted == null ? "—" : projectsCompleted.toLocaleString()}</div>
+//         <div className="text-sm text-(--color-foreground-secondary)">Dự Án Hoàn Thành</div>
+//       </div>
 
-      <div className="text-center space-y-2">
-        <div className="text-4xl font-bold text-(--color-secondary)">{uniqueDonors == null ? "—" : uniqueDonors.toLocaleString()}</div>
-        <div className="text-sm text-(--color-foreground-secondary)">Người Quyên Góp</div>
-      </div>
+//       <div className="text-center space-y-2">
+//         <div className="text-4xl font-bold text-(--color-secondary)">{uniqueDonors == null ? "—" : uniqueDonors.toLocaleString()}</div>
+//         <div className="text-sm text-(--color-foreground-secondary)">Người Quyên Góp</div>
+//       </div>
 
-      <div className="text-center space-y-2">
-        <div className="text-4xl font-bold text-(--color-accent)">{volunteersCount == null ? "—" : volunteersCount.toLocaleString()}</div>
-        <div className="text-sm text-(--color-foreground-secondary)">Tình Nguyện Viên</div>
-      </div>
+//       <div className="text-center space-y-2">
+//         <div className="text-4xl font-bold text-(--color-accent)">{volunteersCount == null ? "—" : volunteersCount.toLocaleString()}</div>
+//         <div className="text-sm text-(--color-foreground-secondary)">Tình Nguyện Viên</div>
+//       </div>
 
-      <div className="text-center space-y-2">
-        <div className="text-4xl font-bold text-(--color-success)">{totalDonations == null ? "—" : formatNumber(totalDonations)}</div>
-        <div className="text-sm text-(--color-foreground-secondary)">Đồng Quyên Góp</div>
-      </div>
-    </div>
-  )
+//       <div className="text-center space-y-2">
+//         <div className="text-4xl font-bold text-(--color-success)">{totalDonations == null ? "—" : formatNumber(totalDonations)}</div>
+//         <div className="text-sm text-(--color-foreground-secondary)">Đồng Quyên Góp</div>
+//       </div>
+//     </div>
+//   )
+// }
+
+
+function calculatePercentage(current: number, target: number): number {
+  if (target <= 0) return 0;
+  const percentage = (current / target) * 100;
+  return Math.min(100, Math.round(percentage));
 }

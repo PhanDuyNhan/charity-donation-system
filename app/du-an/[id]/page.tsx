@@ -52,29 +52,28 @@ export default function ProjectDetailPage() {
           setError("Không tìm thấy dự án.")
           return
         }
-
         const duAn = res[0]
         setProject(duAn)
 
         // ---- Lấy danh sách quyên góp ----
         let qg: QuyenGop[] = []
 
-try {
-  const token = localStorage.getItem("token")
+        try {
 
-  if (token) {
-    qg = await apiClient.getQuyenGop({
-      ma_du_an: `eq.${duAn.id}`,
-      trang_thai_thanh_toan: "eq.hoan_thanh",
-      order: "so_tien.desc",
-    })
-  } else {
-    console.warn("⛔ Không có token → bỏ qua gọi quyen_gop để tránh 403")
-  }
-} catch (err) {
-  console.error("❌ Lỗi gọi quyen_gop:", err)
-}
-        setError("Lỗi khi tải dữ liệu dự án.")
+          qg = await apiClient.getQuyenGop({
+            ma_du_an: `eq.${duAn.id}`,
+            // trang_thai_thanh_toan: "eq.hoan_thanh",
+            select: "*,nguoi_dung(*)",
+            order: "so_tien.desc",
+            limit: 10
+          })
+          setTopDonors(qg)
+          console.log("qg", qg)
+
+        } catch (err) {
+          console.error("❌ Lỗi gọi quyen_gop:", err)
+          setError("Lỗi khi tải dữ liệu dự án.")
+        }
       } finally {
         setLoading(false)
       }
@@ -150,34 +149,38 @@ try {
     setCurrentImage((prev) => (prev - 1 + thuVienAnh.length) % thuVienAnh.length)
   }
 
+
+  const formatMoney = (amount: number) => {
+    return new Intl.NumberFormat("vi-VN").format(amount)
+  }
+
+  const getTopBadge = (index: number) => {
+    if (index === 0) return { emoji: "🥇", color: "from-yellow-400 to-yellow-600", text: "TOP 1" }
+    if (index === 1) return { emoji: "🥈", color: "from-gray-300 to-gray-500", text: "TOP 2" }
+    if (index === 2) return { emoji: "🥉", color: "from-orange-400 to-orange-600", text: "TOP 3" }
+    return null
+  }
+
+
+  const handleQuyenGop = async () => {
+    try {
+      const body = {
+        loiNhan: "hello",
+        soTien: 100000,
+        phuongThucThanhToan: "VNPAY",
+      }
+      const res = await apiClient.handlePayment(body)
+      console.log("Kết quả quyên góp:", res)
+    } catch (err) {
+      console.error("Lỗi khi quyên góp:", err)
+    }
+  }
+
+
   return (
     <div className="min-h-screen bg-background">
 
-      {/* ======== TOP DONORS RUNNING BAR ======== */}
-      {topDonors.length > 0 && (
-        <div className="w-full bg-primary/10 py-3 overflow-x-auto whitespace-nowrap flex items-center gap-4 px-5 border-b border-primary/20">
-          {topDonors.map((d, index) => (
-            <div
-              key={d.id}
-              className="flex items-center gap-3 bg-white shadow rounded-full px-4 py-2 min-w-max hover:shadow-md transition"
-            >
-              <div className="flex items-center justify-center w-9 h-9 rounded-full bg-primary/20 text-primary font-bold">
-                #{index + 1}
-              </div>
-
-              <div>
-                <p className="font-semibold text-sm">
-                  {d.la_quyen_gop_an_danh ? "Ẩn danh" : d.ten_nguoi_quyen_gop}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {d.so_tien.toLocaleString("vi-VN")} đ
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
+     
       {/* ======== HERO ======== */}
       <section className="relative h-64 md:h-80 overflow-hidden">
         <img src={anhDaiDien} className="w-full h-full object-cover" />
@@ -305,7 +308,7 @@ try {
             <p className="text-muted-foreground">📈 Khu vực để nhúng biểu đồ chứng khoán</p>
           </Card>
 
-           {/* ---- TOP DONORS (mini list) ---- */}
+          {/* ---- TOP DONORS (mini list) ---- */}
           <Card className="rounded-xl shadow">
             <CardContent className="p-6 space-y-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -316,27 +319,100 @@ try {
                 <p className="text-muted-foreground">Không có dữ liệu.</p>
               ) : (
                 <div className="space-y-3">
-                  {topDonors.map((d, i) => (
-                    <div
-                      key={d.id}
-                      className="flex justify-between bg-secondary/30 p-3 rounded-lg"
-                    >
-                      <span>
-                        #{i + 1}{" "}
-                        {d.la_quyen_gop_an_danh
-                          ? "Ẩn danh"
-                          : d.ten_nguoi_quyen_gop}
-                      </span>
+                  <div className="grid grid-cols-3 gap-4 mb-8">
+                    {topDonors.slice(0, 3).map((d, index) => {
+                      const badge = getTopBadge(index)
+                      const heights = ["h-40", "h-32", "h-28"]
+                      const orders = [1, 0, 2] // Thứ tự: 2-1-3
 
-                      <span className="font-semibold text-primary">
-                        {d.so_tien.toLocaleString("vi-VN")} đ
-                      </span>
-                    </div>
-                  ))}
+                      return (
+                        <div key={d.id} className={`order-${orders[index]}`}>
+                          <div className="text-center mb-3">
+                            <div className={`inline-block w-16 h-16 bg-gradient-to-br ${badge?.color} rounded-full flex items-center justify-center text-white font-bold text-2xl mb-2 shadow-lg`}>
+                              {d.la_quyen_gop_an_danh
+                                ? "?"
+                                : d.nguoi_dung?.ho?.charAt(0) + d.nguoi_dung?.ten?.charAt(0)}
+                            </div>
+                            <p className="font-bold text-gray-900 truncate px-2">
+                              {d.la_quyen_gop_an_danh
+                                ? "Ẩn danh"
+                                : `${d.nguoi_dung?.ho} ${d.nguoi_dung?.ten}`}
+                            </p>
+                            <p className="text-xl font-bold text-blue-600 mt-1">
+                              {formatMoney(d.so_tien)} đ
+                            </p>
+                          </div>
+                          <div className={`bg-gradient-to-br ${badge?.color} ${heights[index]} rounded-t-2xl flex items-center justify-center shadow-lg`}>
+                            <div className="text-center text-white">
+                              <div className="text-4xl mb-2">{badge?.emoji}</div>
+                              <p className="font-bold text-lg">{badge?.text}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="space-y-3">
+                    {topDonors.slice(3).map((d, index) => (
+                      <div
+                        key={d.id}
+                        className="bg-white rounded-xl shadow hover:shadow-lg transition-all duration-300 p-4 border border-gray-100"
+                      >
+                        <div className="flex items-center gap-4">
+                          {/* Thứ hạng */}
+                          <div className="flex-shrink-0 w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-600">
+                            #{index + 4}
+                          </div>
+
+                          {/* Avatar */}
+                          <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow">
+                            {d.la_quyen_gop_an_danh
+                              ? "?"
+                              : d.nguoi_dung?.ho?.charAt(0) + d.nguoi_dung?.ten?.charAt(0)}
+                          </div>
+
+                          {/* Thông tin */}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 truncate">
+                              {d.la_quyen_gop_an_danh
+                                ? "Ẩn danh"
+                                : `${d.nguoi_dung?.ho} ${d.nguoi_dung?.ten}`}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(d.ngay_tao).toLocaleDateString("vi-VN", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
+
+                          {/* Số tiền */}
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-blue-600">
+                              {formatMoney(d.so_tien)} đ
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Lời nhắn */}
+                        {d.loi_nhan && (
+                          <div className="mt-3 pt-3 border-t border-gray-100">
+                            <p className="text-sm text-gray-600 italic pl-14">
+                              💬 "{d.loi_nhan}"
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+
                 </div>
               )}
             </CardContent>
-          </Card>      
+          </Card>
           {/* ---- DANH SÁCH NGƯỜI QUYÊN GÓP ---- */}
           <Card className="rounded-xl shadow">
             <CardContent className="p-6 space-y-4">
@@ -409,7 +485,7 @@ try {
             </CardContent>
           </Card>
 
-          
+
         </aside>
 
       </section>

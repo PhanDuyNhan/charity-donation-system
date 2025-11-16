@@ -30,7 +30,11 @@ function getEndpoint(key: string, fallback: string) {
 
 export class ApiClient {
   // ==================== CORE REQUEST ====================
-  private static async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private static async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    isPublic: boolean = false,
+  ): Promise<T> {
     const url = getApiUrl(endpoint)
 
     // debug
@@ -39,8 +43,12 @@ export class ApiClient {
     }
     console.log("➡️ Fetching URL:", url)
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-
+    // const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    const token =
+      !isPublic && typeof window !== "undefined"
+        ? localStorage.getItem("token")
+        : null
+    console.log("tokennnnnnnnnnnnnnnnnnnn", token)
     const defaultHeaders: Record<string, string> = {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -102,6 +110,13 @@ export class ApiClient {
   static async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
     const query = params ? `?${buildQueryString(params)}` : ""
     return this.request<T>(`${endpoint}${query}`, { method: "GET" })
+  }
+
+
+  // =================== PUBLIC METHODS (NO AUTH) ====================
+  static async getPublic<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
+    const query = params ? `?${buildQueryString(params)}` : ""
+    return this.request<T>(`${endpoint}${query}`, { method: "GET" }, true)
   }
 
   static async post<T>(endpoint: string, data?: any): Promise<T> {
@@ -168,7 +183,9 @@ export class ApiClient {
   // ==================== DỰ ÁN ====================
   static async getDuAn(params?: Record<string, any>): Promise<DuAn[]> {
     const ep = getEndpoint("DU_AN", "du_an")
-    return this.get<DuAn[]>(ep, params)
+    // return this.get<DuAn[]>(ep, params)
+    return this.getPublic<DuAn[]>(ep, params)
+
   }
 
   static async createDuAn(data: Partial<DuAn>): Promise<DuAn> {
@@ -190,7 +207,9 @@ export class ApiClient {
   // ==================== DANH MỤC DỰ ÁN ====================
   static async getDanhMucDuAn(params?: Record<string, any>): Promise<DanhMucDuAn[]> {
     const ep = getEndpoint("DANH_MUC_DU_AN", "danh_muc_du_an")
-    return this.get<DanhMucDuAn[]>(ep, params)
+    // return this.get<DanhMucDuAn[]>(ep, params)
+    return this.getPublic<DanhMucDuAn[]>(ep, params)
+
   }
 
   // ==================== FILE UPLOAD ====================
@@ -265,7 +284,9 @@ export class ApiClient {
   // ==================== QUYÊN GÓP ====================
   static async getQuyenGop(params?: Record<string, any>): Promise<QuyenGop[]> {
     const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
-    return this.get<QuyenGop[]>(ep, params)
+    // return this.get<QuyenGop[]>(ep, params)
+    return this.getPublic<QuyenGop[]>(ep, params)
+
   }
 
   static async createQuyenGop(data: Partial<QuyenGop>): Promise<QuyenGop> {
@@ -302,6 +323,20 @@ export class ApiClient {
   static async deleteTinhNguyenVien(id: number): Promise<void> {
     const ep = getEndpoint("TINH_NGUYEN_VIEN", "tinh_nguyen_vien")
     return this.delete<void>(`${ep}/${id}`)
+  }
+
+
+  // ==================== Payment ====================
+  static async createPayment(data: any): Promise<any> {
+    const basePath = getEndpoint("QUYEN_GOP", "process-vnpay")
+    const endpointPath = `${basePath}/process-vnpay`;
+    return this.post(endpointPath, data);
+  }
+
+
+  static async handlePayment(data: any): Promise<any> {
+    const basePath = getEndpoint("QUYEN_GOP", "quyen_gop")
+    return this.post(basePath, data);
   }
 }
 

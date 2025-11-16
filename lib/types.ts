@@ -54,9 +54,9 @@ export interface DuAn {
   ngay_bat_dau: string
   ngay_ket_thuc: string
   trang_thai?: TrangThaiDuAn
-  dia_diem?: string
+  dia_diem: string
   thu_vien_anh?: string []
-  muc_do_uu_tien?: MucDoUuTien
+  muc_do_uu_tien: MucDoUuTien
   nguoi_tao: number
   nguoi_phe_duyet?: number | null
   ngay_tao?: string

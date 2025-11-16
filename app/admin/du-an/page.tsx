@@ -89,6 +89,7 @@ export default function AdminDuAnPage() {
     setLoading(true)
     try {
       const res = await apiClient.getDuAn()
+      console.log("ressssssssssssssss", res)
       setDuAns(Array.isArray(res) ? res : [])
     } catch (err) {
       console.error("Lỗi khi lấy dự án:", err)
