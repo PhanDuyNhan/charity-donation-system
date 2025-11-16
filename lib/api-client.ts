@@ -30,7 +30,11 @@ function getEndpoint(key: string, fallback: string) {
 
 export class ApiClient {
   // ==================== CORE REQUEST ====================
-  private static async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private static async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    isPublic: boolean = false,
+  ): Promise<T> {
     const url = getApiUrl(endpoint)
 
     // debug
@@ -39,8 +43,12 @@ export class ApiClient {
     }
     console.log("➡️ Fetching URL:", url)
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-
+    // const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    const token =
+      !isPublic && typeof window !== "undefined"
+        ? localStorage.getItem("token")
+        : null
+    console.log("tokennnnnnnnnnnnnnnnnnnn", token)
     const defaultHeaders: Record<string, string> = {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -104,6 +112,13 @@ export class ApiClient {
     return this.request<T>(`${endpoint}${query}`, { method: "GET" })
   }
 
+
+  // =================== PUBLIC METHODS (NO AUTH) ====================
+  static async getPublic<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
+    const query = params ? `?${buildQueryString(params)}` : ""
+    return this.request<T>(`${endpoint}${query}`, { method: "GET" }, true)
+  }
+
   static async post<T>(endpoint: string, data?: any): Promise<T> {
     return this.request<T>(endpoint, {
       method: "POST",
@@ -130,9 +145,10 @@ export class ApiClient {
   }
 
   // ==================== AUTH ====================
+  // NOTE: many backends expect { email, mat_khau } for login/register
   static async login(email: string, password: string): Promise<any> {
     const ep = getEndpoint("AUTH_LOGIN", "auth/login")
-    return this.post(ep, { email, password })
+    return this.post(ep, { email, password })  // ✔ gửi password đúng chuẩn BE
   }
 
   static async register(data: any): Promise<any> {
@@ -146,9 +162,10 @@ export class ApiClient {
     return this.get<NguoiDung[]>(ep, params)
   }
 
+  // CREATE should be POST (not PATCH) — sửa để tạo user đúng REST
   static async createNguoiDung(data: Partial<NguoiDung>): Promise<NguoiDung> {
     const ep = getEndpoint("NGUOI_DUNG", "nguoi_dung")
-    return this.patch<NguoiDung>(ep, data)
+    return this.post<NguoiDung>(ep, data)
   }
 
   static async updateNguoiDung(id: number, data: Partial<NguoiDung>): Promise<NguoiDung> {
@@ -166,29 +183,33 @@ export class ApiClient {
   // ==================== DỰ ÁN ====================
   static async getDuAn(params?: Record<string, any>): Promise<DuAn[]> {
     const ep = getEndpoint("DU_AN", "du_an")
-    return this.get<DuAn[]>(ep, params)
+    // return this.get<DuAn[]>(ep, params)
+    return this.getPublic<DuAn[]>(ep, params)
+
   }
 
   static async createDuAn(data: Partial<DuAn>): Promise<DuAn> {
     const ep = getEndpoint("DU_AN", "du_an")
-    return this.patch<DuAn>(ep, data)
+    return this.post<DuAn>(ep, data)
   }
 
   static async updateDuAn(id: number, data: Partial<DuAn>): Promise<DuAn> {
     const ep = getEndpoint("DU_AN", "du_an")
-    return this.patch<DuAn>(`${ep}?id=eq.${id}`, data)
+    return this.put<DuAn>(`${ep}/${id}`, data)
   }
 
   static async deleteDuAn(id: number): Promise<void> {
     const ep = getEndpoint("DU_AN", "du_an")
-    return this.delete<void>(`${ep}?id=eq.${id}`)
+    return this.delete<void>(`${ep}/${id}`)
   }
 
 
   // ==================== DANH MỤC DỰ ÁN ====================
   static async getDanhMucDuAn(params?: Record<string, any>): Promise<DanhMucDuAn[]> {
     const ep = getEndpoint("DANH_MUC_DU_AN", "danh_muc_du_an")
-    return this.get<DanhMucDuAn[]>(ep, params)
+    // return this.get<DanhMucDuAn[]>(ep, params)
+    return this.getPublic<DanhMucDuAn[]>(ep, params)
+
   }
 
   // ==================== FILE UPLOAD ====================
@@ -263,22 +284,24 @@ export class ApiClient {
   // ==================== QUYÊN GÓP ====================
   static async getQuyenGop(params?: Record<string, any>): Promise<QuyenGop[]> {
     const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
-    return this.get<QuyenGop[]>(ep, params)
+    // return this.get<QuyenGop[]>(ep, params)
+    return this.getPublic<QuyenGop[]>(ep, params)
+
   }
 
   static async createQuyenGop(data: Partial<QuyenGop>): Promise<QuyenGop> {
     const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
-    return this.patch<QuyenGop>(ep, data)
+    return this.post<QuyenGop>(ep, data)
   }
 
   static async updateQuyenGop(id: number, data: Partial<QuyenGop>): Promise<QuyenGop> {
     const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
-    return this.patch<QuyenGop>(`${ep}?id=eq.${id}`, data)
+    return this.put<QuyenGop>(`${ep}/${id}`, data)
   }
 
   static async deleteQuyenGop(id: number): Promise<void> {
     const ep = getEndpoint("QUYEN_GOP", "quyen_gop")
-    return this.delete<void>(`${ep}?id=eq.${id}`)
+    return this.delete<void>(`${ep}/${id}`)
   }
 
   // ==================== TÌNH NGUYỆN VIÊN ====================
@@ -300,6 +323,20 @@ export class ApiClient {
   static async deleteTinhNguyenVien(id: number): Promise<void> {
     const ep = getEndpoint("TINH_NGUYEN_VIEN", "tinh_nguyen_vien")
     return this.delete<void>(`${ep}/${id}`)
+  }
+
+
+  // ==================== Payment ====================
+  static async createPayment(data: any): Promise<any> {
+    const basePath = getEndpoint("QUYEN_GOP", "process-vnpay")
+    const endpointPath = `${basePath}/process-vnpay`;
+    return this.post(endpointPath, data);
+  }
+
+
+  static async handlePayment(data: any): Promise<any> {
+    const basePath = getEndpoint("QUYEN_GOP", "quyen_gop")
+    return this.post(basePath, data);
   }
 }
 

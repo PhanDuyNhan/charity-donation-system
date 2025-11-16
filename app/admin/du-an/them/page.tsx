@@ -19,7 +19,7 @@ export default function ThemDuAnMoiPage() {
   const [danhMucs, setDanhMucs] = useState<any[]>([])
   const [provinces, setProvinces] = useState<any[]>([])
 
-  // ✅ Khai báo formData với kiểu chính xác
+  // form data
   const [formData, setFormData] = useState({
     tieu_de: "",
     mo_ta: "",
@@ -52,7 +52,6 @@ export default function ThemDuAnMoiPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      // ✅ Ép kiểu dữ liệu chuẩn trước khi gửi API
       await apiClient.createDuAn({
         ...formData,
         ma_danh_muc: Number(formData.ma_danh_muc) || 0,
@@ -70,7 +69,6 @@ export default function ThemDuAnMoiPage() {
   }
 
   return (
-    // page background gray like admin
     <div className="min-h-[calc(100vh-48px)] bg-[#111827] text-white">
       <div className="max-w-[1280px] mx-auto px-6 space-y-6">
         {/* Header */}
@@ -88,7 +86,8 @@ export default function ThemDuAnMoiPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit}>
-          <Card className="bg-[#0f1724] border border-neutral-700 p-0 rounded-md overflow-hidden">
+          {/* admin-card style applied */}
+          <Card className="admin-card bg-[#0f1724] border border-neutral-700 p-0 rounded-md overflow-hidden">
             <CardHeader className="px-6 pt-6">
               <CardTitle>Thông tin dự án</CardTitle>
             </CardHeader>
@@ -112,42 +111,42 @@ export default function ThemDuAnMoiPage() {
               {/* Danh mục + Địa điểm */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                <Label>Danh mục</Label>
-                <Select 
-                  value={String(formData.ma_danh_muc || "")}
-                  onValueChange={(v) => setFormData({ ...formData, ma_danh_muc: Number(v) })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn danh mục" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {danhMucs.map((dm: any) => (
-                      <SelectItem key={dm.id} value={String(dm.id)}>
-                        {dm.ten ?? dm.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  <Label>Danh mục</Label>
+                  <Select
+                    value={String(formData.ma_danh_muc || "")}
+                    onValueChange={(v) => setFormData({ ...formData, ma_danh_muc: Number(v) })}
+                  >
+                    <SelectTrigger className="bg-[#111827] border border-neutral-700 text-white min-w-[160px]">
+                      <SelectValue placeholder="Chọn danh mục" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {danhMucs.map((dm: any) => (
+                        <SelectItem key={dm.id} value={String(dm.id)}>
+                          {dm.ten ?? dm.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
                 <div className="space-y-2">
-                <Label>Địa điểm</Label>
-                <Select
-                  value={formData.dia_diem || ""}
-                  onValueChange={(v) => setFormData({ ...formData, dia_diem: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn địa điểm" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {provinces.map((p: any) => (
-                      <SelectItem key={p.code} value={p.name}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  <Label>Địa điểm</Label>
+                  <Select
+                    value={formData.dia_diem || ""}
+                    onValueChange={(v) => setFormData({ ...formData, dia_diem: v })}
+                  >
+                    <SelectTrigger className="bg-[#111827] border border-neutral-700 text-white min-w-[160px]">
+                      <SelectValue placeholder="Chọn địa điểm" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {provinces.map((p: any) => (
+                        <SelectItem key={p.code} value={p.name}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Ngày + Số tiền */}
@@ -178,9 +177,7 @@ export default function ThemDuAnMoiPage() {
                     type="number"
                     placeholder="Nhập số tiền mục tiêu"
                     value={formData.so_tien_muc_tieu || ""}
-                    onChange={(e) =>
-                      setFormData({ ...formData, so_tien_muc_tieu: Number(e.target.value) })
-                    }
+                    onChange={(e) => setFormData({ ...formData, so_tien_muc_tieu: Number(e.target.value) })}
                     className="bg-[#111827] border border-neutral-700 text-white"
                   />
                 </div>
@@ -287,10 +284,7 @@ export default function ThemDuAnMoiPage() {
                         e.preventDefault()
                         setFormData({
                           ...formData,
-                          thu_vien_anh: [
-                            ...(formData.thu_vien_anh || []),
-                            e.currentTarget.value.trim(),
-                          ],
+                          thu_vien_anh: [...(formData.thu_vien_anh || []), e.currentTarget.value.trim()],
                         })
                         e.currentTarget.value = ""
                       }

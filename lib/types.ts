@@ -23,19 +23,14 @@ export type TrangThaiNoiDung = "ban_nhap" | "da_xuat_ban" | "luu_tru"
 export interface NguoiDung {
   id: number;
   email: string;
-  mat_khau_hash?: string;
+  mat_khau?: string;   // ← khớp với BE /nguoi_dung
   ten: string;
   ho: string;
   so_dien_thoai?: string | null;
   dia_chi?: string | null;
-  ngay_sinh?: string | null;
   vai_tro: VaiTroNguoiDung;
   trang_thai?: TrangThaiNguoiDung | string;
-  email_da_xac_thuc?: boolean;
-  thoi_gian_xac_thuc_email?: string | null;
-  token_ghi_nho?: string | null;
   ngay_tao?: string;
-  ngay_cap_nhat?: string;
 }
 
 export interface DanhMucDuAn {
@@ -51,23 +46,19 @@ export interface DanhMucDuAn {
 export interface DuAn {
   id: number
   tieu_de: string
-  duong_dan: string
   mo_ta: string
-  mo_ta_ngan?: string
+  mo_chi_tiet: string
   ma_danh_muc: number
   so_tien_muc_tieu: number
   so_tien_hien_tai: number
   ngay_bat_dau: string
   ngay_ket_thuc: string
   trang_thai?: TrangThaiDuAn
-  dia_diem?: string
-  so_nguoi_thu_huong?: number
-  anh_dai_dien?: string
+  dia_diem: string
   thu_vien_anh?: string []
-  muc_do_uu_tien?: MucDoUuTien
+  muc_do_uu_tien: MucDoUuTien
   nguoi_tao: number
   nguoi_phe_duyet?: number | null
-  thoi_gian_phe_duyet?: string | null
   ngay_tao?: string
   ngay_cap_nhat?: string
 }
@@ -81,21 +72,11 @@ export interface QuyenGop {
   phuong_thuc_thanh_toan: PhuongThucThanhToan
   trang_thai_thanh_toan: TrangThaiThanhToan
   ma_giao_dich?: string
-  ma_giao_dich_ngoai?: string
-  la_quyen_gop_dinh_ky: boolean
-  tan_suat_quyen_gop?: string
-  ngay_thanh_toan_tiep_theo?: string
   duong_dan_bien_lai?: string
-  ten_nguoi_quyen_gop?: string
-  email_nguoi_quyen_gop?: string
-  sdt_nguoi_quyen_gop?: string
-  la_quyen_gop_an_danh: boolean
   loi_nhan?: string
   phi_giao_dich: number
-  so_tien_thuc_nhan: number
   ngay_tao: string
   ngay_cap_nhat: string
-  ngay_hoan_thanh?: string
 }
 
 export interface SuKien {

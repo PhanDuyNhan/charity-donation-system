@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Heart, CreditCard, Wallet } from "lucide-react"
+import { apiClient } from "@/lib/api-client"
 
 interface DonationFormProps {
   projectId: number
@@ -25,15 +26,20 @@ export function DonationForm({ projectId, projectName }: DonationFormProps) {
     e.preventDefault()
     setIsSubmitting(true)
     try {
-      console.log("Donation submitted:", {
-        projectId,
-        projectName,
-        amount,
-        donationType,
-        paymentMethod,
-      })
-      // TODO: Implement payment gateway integration (VNPay, MoMo)
-    } finally {
+      const body = {
+        loiNhan: "quyen gop du an",
+        soTien: amount,
+        phuongThucThanhToan: paymentMethod,
+      }
+      console.log("body", body)
+      const res = await apiClient.createPayment(body)
+      console.log("Kết quả quyên góp:", res.vnpUrl)
+      window.location.href = res.vnpUrl
+    } 
+    catch(err) {
+      console.error("Lỗi quyên góp:", err)
+    }
+    finally {
       setIsSubmitting(false)
     }
   }
@@ -50,21 +56,6 @@ export function DonationForm({ projectId, projectName }: DonationFormProps) {
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Loại quyên góp</label>
-            <Select value={donationType} onValueChange={setDonationType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="one-time">Quyên góp một lần</SelectItem>
-                <SelectItem value="monthly">Quyên góp hàng tháng</SelectItem>
-                <SelectItem value="quarterly">Quyên góp hàng quý</SelectItem>
-                <SelectItem value="yearly">Quyên góp hàng năm</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
             <label className="block text-sm font-medium text-foreground mb-3">Chọn số tiền</label>
             <div className="grid grid-cols-2 gap-2 mb-3">
               {presetAmounts.map((preset) => (
@@ -72,11 +63,10 @@ export function DonationForm({ projectId, projectName }: DonationFormProps) {
                   key={preset}
                   type="button"
                   onClick={() => setAmount(preset.toString())}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    amount === preset.toString()
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${amount === preset.toString()
                       ? "bg-primary text-primary-foreground"
                       : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                  }`}
+                    }`}
                 >
                   {(preset / 1000).toFixed(0)}K
                 </button>

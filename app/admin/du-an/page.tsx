@@ -22,16 +22,26 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 
-// helper: remove diacritics for searching
+// NEW imports for added UI pieces
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card"
+
+//
+// helper: remove Vietnamese tones for searching
+//
 function removeVietnameseTones(str: string): string {
-  return (
-    str
-      .normalize("NFD")
-      .replace(/[̀-\u036f]/g, "")
-      .replace(/đ/g, "d")
-      .replace(/Đ/g, "D")
-      .toLowerCase()
-  )
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
 }
 
 export default function AdminDuAnPage() {
@@ -57,6 +67,9 @@ export default function AdminDuAnPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
+  // selection state for checkboxes
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+
   useEffect(() => {
     fetchAll()
     fetchDanhMuc()
@@ -76,6 +89,7 @@ export default function AdminDuAnPage() {
     setLoading(true)
     try {
       const res = await apiClient.getDuAn()
+      console.log("ressssssssssssssss", res)
       setDuAns(Array.isArray(res) ? res : [])
     } catch (err) {
       console.error("Lỗi khi lấy dự án:", err)
@@ -122,7 +136,7 @@ export default function AdminDuAnPage() {
     return found ? found.ten : "—"
   }
 
-  // filtered list with robust search (no-diacritics, multi-term)
+  // Filtered list
   const filtered = duAns
     .filter((d) => {
       if (!search) return true
@@ -134,10 +148,10 @@ export default function AdminDuAnPage() {
     .filter((d) => (statusFilter ? String(d.trang_thai) === statusFilter : true))
     .filter((d) => {
       if (!startDate && !endDate) return true
-      const projectStart = d.ngay_bat_dau ? new Date(d.ngay_bat_dau) : null
-      const projectEnd = d.ngay_ket_thuc ? new Date(d.ngay_ket_thuc) : null
-      if (startDate && projectEnd && projectEnd < startDate) return false
-      if (endDate && projectStart && projectStart > endDate) return false
+      const start = d.ngay_bat_dau ? new Date(d.ngay_bat_dau) : null
+      const end = d.ngay_ket_thuc ? new Date(d.ngay_ket_thuc) : null
+      if (startDate && end && end < startDate) return false
+      if (endDate && start && start > endDate) return false
       return true
     })
 
@@ -155,209 +169,377 @@ export default function AdminDuAnPage() {
     setStartDate(undefined)
     setEndDate(undefined)
     setCurrentPage(1)
+    setSelectedIds([])
   }
 
+  // --- Selection helpers ---
+  const isAllPageSelected = paginated.length > 0 && paginated.every((p) => selectedIds.includes(Number(p.id)))
+  const isSomeSelected = selectedIds.length > 0
+
+  function toggleSelectOne(id: number, checked?: boolean) {
+    setSelectedIds((prev) => {
+      const has = prev.includes(id)
+      if (typeof checked === "boolean") {
+        if (checked && !has) return [...prev, id]
+        if (!checked && has) return prev.filter((x) => x !== id)
+        return prev
+      } else {
+        // toggle
+        return has ? prev.filter((x) => x !== id) : [...prev, id]
+      }
+    })
+  }
+
+  function toggleSelectAllOnPage(checked: boolean) {
+    if (checked) {
+      // add all paginated ids that aren't already selected
+      setSelectedIds((prev) => {
+        const add = paginated.map((p) => Number(p.id)).filter((id) => !prev.includes(id))
+        return [...prev, ...add]
+      })
+    } else {
+      // remove all paginated ids from selection
+      setSelectedIds((prev) => prev.filter((id) => !paginated.some((p) => Number(p.id) === id)))
+    }
+  }
+
+  // Bulk actions
+  async function handleBulkDelete() {
+    if (selectedIds.length === 0) {
+      alert("Chưa chọn dự án nào.")
+      return
+    }
+    if (!confirm(`Bạn có chắc muốn xóa ${selectedIds.length} dự án đã chọn không?`)) return
+    try {
+      // call delete API for each selected id
+      await Promise.all(selectedIds.map((id) => apiClient.deleteDuAn(Number(id))))
+      alert("Xóa thành công.")
+      setSelectedIds([])
+      fetchAll()
+    } catch (err) {
+      console.error("Lỗi xóa hàng loạt:", err)
+      alert("Xóa thất bại.")
+    }
+  }
+
+  function exportSelectedToCSV() {
+    if (selectedIds.length === 0) {
+      alert("Chưa chọn dự án nào để xuất.")
+      return
+    }
+    const rows = duAns
+      .filter((d) => selectedIds.includes(Number(d.id)))
+      .map((d) => ({
+        id: d.id,
+        tieu_de: d.tieu_de,
+        danh_muc: getCategoryName(d.ma_danh_muc),
+        ngay_bat_dau: d.ngay_bat_dau,
+        ngay_ket_thuc: d.ngay_ket_thuc,
+        so_tien_muc_tieu: d.so_tien_muc_tieu,
+        trang_thai: d.trang_thai,
+      }))
+
+    const header = Object.keys(rows[0] || {}).join(",")
+    const csv = [header, ...rows.map((r) => Object.values(r).map((v) => `"${String(v ?? "")}"`).join(","))].join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `du-an-export-${new Date().toISOString()}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Stats for top cards
+  const stats = useMemo(() => {
+    const total = duAns.length
+    const hoat_dong = duAns.filter((d) => d.trang_thai === "hoat_dong").length
+    const hoan_thanh = duAns.filter((d) => d.trang_thai === "hoan_thanh").length
+    const tam_dung = duAns.filter((d) => d.trang_thai === "tam_dung").length
+    return { total, hoat_dong, hoan_thanh, tam_dung }
+  }, [duAns])
+
   return (
-    // page background: slightly gray (like homepage)
     <div className="min-h-[calc(100vh-48px)] p-6 bg-[#111827] text-white">
       <div className="max-w-[1280px] mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold">Quản lý Dự Án</h1>
-          </div>
+          <h1 className="text-3xl font-extrabold">Quản lý Dự Án</h1>
           <div className="flex items-center gap-3">
             <Button onClick={openCreate} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg">
               <Plus className="h-4 w-4" /> Thêm dự án
             </Button>
-            <Button variant="ghost" className="border border-neutral-700 text-neutral-200" onClick={fetchAll}>
+            <Button variant="ghost" className="border border-neutral-700 text-neutral-200 hover:bg-[#1f2937]" onClick={fetchAll}>
               Tải lại
             </Button>
           </div>
         </div>
 
-        {/* Main column only (no sidebar) */}
-        <div className="space-y-6">
-          {/* Filters Card */}
-          <Card className="bg-[#0f1724] border border-neutral-700 p-0 rounded-md overflow-hidden">
-            <CardHeader className="px-6 pt-6">
-              <CardTitle className="text-white text-lg">Tìm kiếm & Bộ lọc</CardTitle>
-              <CardDescription className="text-neutral-400">Tìm theo tiêu đề, danh mục, trạng thái và khoảng thời gian</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="flex flex-wrap gap-3 items-center">
-                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                  <Search size={16} className="text-neutral-300" />
-                  <Input
-                    className="bg-[#111827] border border-neutral-700 text-white placeholder:text-neutral-500"
-                    placeholder="Tìm theo tiêu đề (không dấu)"
-                    value={search}
-                    onChange={(e) => {
-                      setSearch(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                  />
-                </div>
-
-                <Select
-                  onValueChange={(v) => {
-                    setCategoryId(v && v !== ALL_VALUE ? Number(v) : undefined)
-                    setCurrentPage(1)
-                  }}
-                >
-                  <SelectTrigger className="min-w-[170px] text-sm bg-[#111827] border border-neutral-700 text-white">
-                    <SelectValue placeholder={loadingDanhMuc ? "Đang tải..." : "Danh mục"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_VALUE}>Tất cả</SelectItem>
-                    {danhMucs.map((dm) => (
-                      <SelectItem key={dm.id} value={String(dm.id)}>
-                        {dm.ten}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  onValueChange={(v) => {
-                    setStatusFilter(v && v !== ALL_VALUE ? v : undefined)
-                    setCurrentPage(1)
-                  }}
-                >
-                  <SelectTrigger className="min-w-[140px] text-sm bg-[#111827] border border-neutral-700 text-white">
-                    <SelectValue placeholder="Trạng thái" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_VALUE}>Tất cả</SelectItem>
-                    <SelectItem value="hoat_dong">Hoạt động</SelectItem>
-                    <SelectItem value="tam_dung">Tạm dừng</SelectItem>
-                    <SelectItem value="ban_nhap">Bản nháp</SelectItem>
-                    <SelectItem value="hoan_thanh">Hoàn thành</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="text-sm w-[150px] justify-start text-left font-normal border border-neutral-700 bg-[#111827]">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? format(startDate, "dd/MM/yyyy", { locale: vi }) : "Ngày bắt đầu"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="p-0">
-                    <Calendar mode="single" selected={startDate} onSelect={setStartDate} locale={vi} />
-                  </PopoverContent>
-                </Popover>
-
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="text-sm w-[150px] justify-start text-left font-normal border border-neutral-700 bg-[#111827]">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? format(endDate, "dd/MM/yyyy", { locale: vi }) : "Ngày kết thúc"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="p-0">
-                    <Calendar mode="single" selected={endDate} onSelect={setEndDate} locale={vi} />
-                  </PopoverContent>
-                </Popover>
-
-                <div className="flex-1" />
-
-                <Button variant="secondary" className="text-sm flex items-center gap-1" onClick={resetFilters}>
-                  <XCircle className="h-4 w-4" /> Xóa bộ lọc
-                </Button>
+        {/* --- Stats cards --- */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="admin-card bg-[#0f1724] border border-neutral-700 shadow-md">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-neutral-400">Tổng dự án</p>
+                <p className="text-2xl font-bold">{stats.total}</p>
               </div>
+              <div className="text-neutral-300 text-xl">📚</div>
             </CardContent>
           </Card>
 
-          {/* Table card: put border on the Card so it spans full width */}
-          <Card className="bg-[#0f1724] border border-neutral-700 p-0 rounded-md overflow-hidden">
-            <CardHeader className="px-6 pt-6 flex items-center justify-between">
+          <Card className="admin-card bg-[#0f1724] border border-neutral-700 shadow-md">
+            <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <CardTitle className="text-white text-lg">Danh sách dự án</CardTitle>
-                <CardDescription className="text-neutral-400">{filtered.length} kết quả</CardDescription>
+                <p className="text-sm text-neutral-400">Đang hoạt động</p>
+                <p className="text-2xl font-bold">{stats.hoat_dong}</p>
               </div>
-              <div className="hidden sm:flex items-center gap-2">
-                <Button size="sm" variant="ghost" onClick={fetchAll} className="border border-neutral-700 text-neutral-200">
-                  Tải lại
-                </Button>
-              </div>
-            </CardHeader>
+              <div className="text-neutral-300 text-xl">⚡️</div>
+            </CardContent>
+          </Card>
 
-            <CardContent className="p-0">
-              {/* inner area with padding so border touches card edges */}
-              <div className="overflow-x-auto bg-[#111827] rounded-b-md">
-                <table className="w-full table-auto">
-                  <thead>
-                    <tr className="text-left text-sm text-neutral-400 border-b border-neutral-700">
-                      <th className="py-3 px-6">Tiêu đề</th>
-                      <th className="py-3 px-6">Danh mục</th>
-                      <th className="py-3 px-6">Ngày bắt đầu</th>
-                      <th className="py-3 px-6">Ngày kết thúc</th>
-                      <th className="py-3 px-6">Mục tiêu</th>
-                      <th className="py-3 px-6">Trạng thái</th>
-                      <th className="py-3 px-6">Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan={7} className="py-6 text-center text-sm text-neutral-400">Đang tải...</td>
-                      </tr>
-                    ) : paginated.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="py-6 text-center text-sm text-neutral-400">Không có dự án</td>
-                      </tr>
-                    ) : (
-                      paginated.map((d) => (
-                        <tr key={d.id} className="border-b border-neutral-700 hover:bg-[#0b1220]">
-                          <td className="py-4 px-6 max-w-[260px] truncate">{d.tieu_de}</td>
-                          <td className="py-4 px-6">{getCategoryName(d.ma_danh_muc)}</td>
-                          <td className="py-4 px-6">{d.ngay_bat_dau}</td>
-                          <td className="py-4 px-6">{d.ngay_ket_thuc}</td>
-                          <td className="py-4 px-6">{Number(d.so_tien_muc_tieu || 0).toLocaleString()}</td>
-                          <td className="py-4 px-6">{d.trang_thai}</td>
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-2">
-                              <Button size="sm" className="text-xs bg-[#0f1724] border border-neutral-700" onClick={() => openEdit(d)}>
-                                <Edit2 className="mr-1 h-3.5 w-3.5" /> Sửa
-                              </Button>
-                              <Button size="sm" variant="destructive" className="text-xs" onClick={() => handleDelete(d)}>
-                                <Trash2 className="mr-1 h-3.5 w-3.5" /> Xóa
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+          <Card className="admin-card bg-[#0f1724] border border-neutral-700 shadow-md">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-neutral-400">Hoàn thành</p>
+                <p className="text-2xl font-bold">{stats.hoan_thanh}</p>
               </div>
+              <div className="text-neutral-300 text-xl">✅</div>
+            </CardContent>
+          </Card>
 
-              {/* pagination */}
-              {totalPages > 1 && (
-                <div className="mt-4 flex items-center justify-end px-6 py-4">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} />
-                      </PaginationItem>
-                      {Array.from({ length: totalPages }).map((_, i) => (
-                        <PaginationItem key={i}>
-                          <PaginationLink isActive={currentPage === i + 1} onClick={() => setCurrentPage(i + 1)}>
-                            {i + 1}
-                          </PaginationLink>
-                        </PaginationItem>
-                      ))}
-                      <PaginationItem>
-                        <PaginationNext onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              )}
+          <Card className="admin-card bg-[#0f1724] border border-neutral-700 shadow-md">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-neutral-400">Tạm dừng</p>
+                <p className="text-2xl font-bold">{stats.tam_dung}</p>
+              </div>
+              <div className="text-neutral-300 text-xl">⏸️</div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Filters */}
+        <Card className="admin-card bg-[#0f1724] border border-neutral-700 shadow-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold">Tìm kiếm & Bộ lọc</CardTitle>
+            <CardDescription className="text-neutral-400">Tìm theo tiêu đề, danh mục, trạng thái và khoảng thời gian</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                <Search size={16} className="text-neutral-300" />
+                <Input
+                  className="bg-[#111827] border border-neutral-700 text-white placeholder:text-neutral-500"
+                  placeholder="Tìm theo tiêu đề (không dấu)"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value)
+                    setCurrentPage(1)
+                  }}
+                />
+              </div>
+
+              {/* Danh mục */}
+              <Select onValueChange={(v) => { setCategoryId(v && v !== ALL_VALUE ? Number(v) : undefined); setCurrentPage(1) }}>
+                <SelectTrigger className="min-w-[160px] text-sm bg-[#111827] border border-neutral-700 text-white">
+                  <SelectValue placeholder={loadingDanhMuc ? "Đang tải..." : "Danh mục"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_VALUE}>Tất cả</SelectItem>
+                  {danhMucs.map((dm) => (
+                    <SelectItem key={dm.id} value={String(dm.id)}>{dm.ten}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Trạng thái */}
+              <Select onValueChange={(v) => { setStatusFilter(v && v !== ALL_VALUE ? v : undefined); setCurrentPage(1) }}>
+                <SelectTrigger className="min-w-[150px] text-sm bg-[#111827] border border-neutral-700 text-white">
+                  <SelectValue placeholder="Trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_VALUE}>Tất cả</SelectItem>
+                  <SelectItem value="hoat_dong">Hoạt động</SelectItem>
+                  <SelectItem value="tam_dung">Tạm dừng</SelectItem>
+                  <SelectItem value="ban_nhap">Bản nháp</SelectItem>
+                  <SelectItem value="hoan_thanh">Hoàn thành</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Ngày */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={`text-sm w-[150px] justify-start border border-neutral-700 bg-[#111827] ${startDate ? "ring-1 ring-green-500" : ""}`}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, "dd/MM/yyyy", { locale: vi }) : "Ngày bắt đầu"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="p-0">
+                  <Calendar mode="single" selected={startDate} onSelect={setStartDate} locale={vi} />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={`text-sm w-[150px] justify-start border border-neutral-700 bg-[#111827] ${endDate ? "ring-1 ring-green-500" : ""}`}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {endDate ? format(endDate, "dd/MM/yyyy", { locale: vi }) : "Ngày kết thúc"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="p-0">
+                  <Calendar mode="single" selected={endDate} onSelect={setEndDate} locale={vi} />
+                </PopoverContent>
+              </Popover>
+
+              <div className="flex-1" />
+              <Button variant="secondary" className="text-sm flex items-center gap-1 hover:bg-[#1f2937]" onClick={resetFilters}>
+                <XCircle className="h-4 w-4" /> Xóa bộ lọc
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Table with selection, hovercard, dropdown action */}
+        <Card className="admin-card bg-[#0f1724] border border-neutral-700 shadow-md">
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-semibold">Danh sách dự án</CardTitle>
+              <CardDescription className="text-neutral-400">{filtered.length} kết quả</CardDescription>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="ghost" className="border border-neutral-700 text-neutral-200 hover:bg-[#1f2937]" onClick={fetchAll}>
+                Tải lại
+              </Button>
+
+              {/* Bulk actions */}
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={exportSelectedToCSV} disabled={!isSomeSelected} className="text-sm" >
+                  Xuất CSV
+                </Button>
+                <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={!isSomeSelected} className="text-sm">
+                  Xóa đã chọn
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-0">
+            <div className="overflow-x-auto bg-[#111827] rounded-b-md">
+              <table className="w-full table-auto">
+                <thead>
+                  <tr className="text-left text-sm text-neutral-400 border-b border-neutral-700">
+                    <th className="py-3 px-4">
+                      <Checkbox
+                        checked={isAllPageSelected}
+                        onCheckedChange={(v) => toggleSelectAllOnPage(Boolean(v))}
+                      />
+                    </th>
+                    <th className="py-3 px-6">Tiêu đề</th>
+                    <th className="py-3 px-6">Danh mục</th>
+                    <th className="py-3 px-6">Ngày bắt đầu</th>
+                    <th className="py-3 px-6">Ngày kết thúc</th>
+                    <th className="py-3 px-6">Mục tiêu</th>
+                    <th className="py-3 px-6">Trạng thái</th>
+                    <th className="py-3 px-6 text-center">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={8} className="py-6 text-center text-sm text-neutral-400">Đang tải...</td></tr>
+                  ) : paginated.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center">
+                        <div className="space-y-3">
+                          <p className="text-neutral-400">Không có dự án khớp.</p>
+                          <Button onClick={openCreate}>Tạo dự án mới</Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginated.map((d) => (
+                      <tr key={d.id} className="border-b border-neutral-700 hover:bg-[#0b1220] transition-colors">
+                        <td className="py-3 px-4">
+                          <Checkbox
+                            checked={selectedIds.includes(Number(d.id))}
+                            onCheckedChange={(v) => toggleSelectOne(Number(d.id), Boolean(v))}
+                          />
+                        </td>
+
+                        {/* HoverCard around title (truncate + preview) */}
+                        <td className="py-3 px-6 max-w-[260px]">
+                          <HoverCard>
+                            <HoverCardTrigger>
+                              <div className="truncate cursor-help">{d.tieu_de}</div>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-72 p-3">
+                              <p className="text-sm text-neutral-200">{d.mo_ta ?? "Không có mô tả"}</p>
+                              <div className="mt-2 text-xs text-neutral-400">Người tạo: {d.nguoi_tao ?? "—"}</div>
+                              <div className="text-xs text-neutral-400">ID: {d.id}</div>
+                            </HoverCardContent>
+                          </HoverCard>
+                        </td>
+
+                        <td className="py-3 px-6">{getCategoryName(d.ma_danh_muc)}</td>
+                        <td className="py-3 px-6">{d.ngay_bat_dau}</td>
+                        <td className="py-3 px-6">{d.ngay_ket_thuc}</td>
+                        <td className="py-3 px-6">{Number(d.so_tien_muc_tieu || 0).toLocaleString()}</td>
+                        <td className="py-3 px-6">
+                          <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${d.trang_thai === "hoat_dong" ? "bg-green-700" : d.trang_thai === "hoan_thanh" ? "bg-neutral-600" : d.trang_thai === "tam_dung" ? "bg-yellow-600 text-black" : "bg-neutral-700"}`}>
+                            {d.trang_thai}
+                          </span>
+                        </td>
+
+                        {/* DropdownMenu for actions */}
+                        <td className="py-3 px-6 text-center">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="ghost" className="px-2">⋯</Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onSelect={() => openEdit(d)}>
+                                <div className="flex items-center gap-2"><Edit2 className="h-4 w-4" /> Sửa</div>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => handleDelete(d)}>
+                                <div className="flex items-center gap-2 text-red-400"><Trash2 className="h-4 w-4" /> Xóa</div>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => router.push(`/du-an/${d.id}`)}>
+                                Xem chi tiết
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* pagination */}
+            {totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-end px-6 py-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} />
+                    </PaginationItem>
+                    {Array.from({ length: totalPages }).map((_, i) => (
+                      <PaginationItem key={i}>
+                        <PaginationLink isActive={currentPage === i + 1} onClick={() => setCurrentPage(i + 1)}>
+                          {i + 1}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

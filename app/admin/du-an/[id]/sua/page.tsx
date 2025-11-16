@@ -19,7 +19,7 @@ export default function SuaDuAnPage() {
   const [formData, setFormData] = useState<any>(null)
   const [danhMucs, setDanhMucs] = useState<any[]>([])
   const [provinces, setProvinces] = useState<any[]>([])
-
+  console.log("2222222222222222222222222222")
   useEffect(() => {
     if (id) loadData()
   }, [id])
@@ -30,7 +30,7 @@ export default function SuaDuAnPage() {
       const [duAnArr, dm, prov] = await Promise.all([
         apiClient.getDuAn({ id: `eq.${id}` }),
         apiClient.getDanhMucDuAn(),
-        fetch("https://provinces.open-api.vn/api/?depth=1").then(r => r.json()),
+        fetch("https://provinces.open-api.vn/api/?depth=1").then((r) => r.json()),
       ])
       setDanhMucs(dm)
       setProvinces(prov)
@@ -66,31 +66,32 @@ export default function SuaDuAnPage() {
   if (!formData) return <div className="p-6">Đang tải dữ liệu...</div>
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-[calc(100vh-48px)] bg-[#111827] text-white px-6 py-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 mb-4">
         <Link href="/admin/du-an">
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" className="border-neutral-700 text-neutral-200">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
         <div>
           <h1 className="text-3xl font-bold">Chỉnh sửa dự án</h1>
-          <p className="text-muted-foreground mt-1">Cập nhật thông tin dự án</p>
+          <p className="text-neutral-400 mt-1">Cập nhật thông tin dự án</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader>
+        <Card className="admin-card bg-[#0f1724] border border-neutral-700 p-0 rounded-md overflow-hidden">
+          <CardHeader className="px-6 pt-6">
             <CardTitle>Thông tin dự án</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="p-6 space-y-6">
             <div className="space-y-2">
               <Label>Tiêu đề</Label>
               <Input
                 value={formData.tieu_de || ""}
                 onChange={(e) => setFormData({ ...formData, tieu_de: e.target.value })}
+                className="bg-[#111827] border border-neutral-700 text-white"
               />
             </div>
 
@@ -101,7 +102,7 @@ export default function SuaDuAnPage() {
                   value={String(formData.ma_danh_muc || "")}
                   onValueChange={(v) => setFormData({ ...formData, ma_danh_muc: Number(v) })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-[#111827] border border-neutral-700 text-white min-w-[160px]">
                     <SelectValue placeholder="Chọn danh mục" />
                   </SelectTrigger>
                   <SelectContent>
@@ -120,7 +121,7 @@ export default function SuaDuAnPage() {
                   value={formData.dia_diem || ""}
                   onValueChange={(v) => setFormData({ ...formData, dia_diem: v })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-[#111827] border border-neutral-700 text-white min-w-[160px]">
                     <SelectValue placeholder="Chọn địa điểm" />
                   </SelectTrigger>
                   <SelectContent>
@@ -141,6 +142,7 @@ export default function SuaDuAnPage() {
                   type="date"
                   value={formData.ngay_bat_dau || ""}
                   onChange={(e) => setFormData({ ...formData, ngay_bat_dau: e.target.value })}
+                  className="bg-[#111827] border border-neutral-700 text-white"
                 />
               </div>
               <div className="space-y-2">
@@ -149,6 +151,7 @@ export default function SuaDuAnPage() {
                   type="date"
                   value={formData.ngay_ket_thuc || ""}
                   onChange={(e) => setFormData({ ...formData, ngay_ket_thuc: e.target.value })}
+                  className="bg-[#111827] border border-neutral-700 text-white"
                 />
               </div>
               <div className="space-y-2">
@@ -157,6 +160,7 @@ export default function SuaDuAnPage() {
                   type="number"
                   value={formData.so_tien_muc_tieu || ""}
                   onChange={(e) => setFormData({ ...formData, so_tien_muc_tieu: e.target.value })}
+                  className="bg-[#111827] border border-neutral-700 text-white"
                 />
               </div>
             </div>
@@ -167,16 +171,16 @@ export default function SuaDuAnPage() {
                 rows={5}
                 value={formData.mo_ta || ""}
                 onChange={(e) => setFormData({ ...formData, mo_ta: e.target.value })}
+                className="bg-[#111827] border border-neutral-700 text-white"
               />
             </div>
 
             {/* Ảnh đại diện */}
             <div className="space-y-2">
               <Label>Ảnh đại diện (URL)</Label>
-
               <div className="flex gap-2">
                 <Input
-                  className="flex-1"
+                  className="flex-1 bg-[#111827] border border-neutral-700 text-white"
                   value={formData.anh_dai_dien || ""}
                   onChange={(e) => setFormData({ ...formData, anh_dai_dien: e.target.value })}
                   placeholder="Dán URL hoặc tải ảnh"
@@ -185,6 +189,7 @@ export default function SuaDuAnPage() {
                   type="button"
                   variant="outline"
                   onClick={() => document.getElementById("avatarUploadInput")?.click()}
+                  className="border-neutral-700 text-neutral-200"
                 >
                   Tải ảnh
                 </Button>
@@ -217,7 +222,7 @@ export default function SuaDuAnPage() {
                 <img
                   src={formData.anh_dai_dien}
                   alt="Ảnh đại diện"
-                  className="w-40 h-40 object-cover mt-2 rounded-md border"
+                  className="w-40 h-40 object-cover mt-2 rounded-md border border-neutral-700"
                 />
               )}
             </div>
@@ -232,7 +237,7 @@ export default function SuaDuAnPage() {
                       <img
                         src={url}
                         alt={`Ảnh ${idx + 1}`}
-                        className="w-32 h-32 object-cover rounded-md border"
+                        className="w-32 h-32 object-cover rounded-md border border-neutral-700"
                       />
                       <button
                         type="button"
@@ -249,7 +254,7 @@ export default function SuaDuAnPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">Chưa có ảnh nào</p>
+                  <p className="text-sm text-neutral-400">Chưa có ảnh nào</p>
                 )}
               </div>
 
@@ -267,11 +272,13 @@ export default function SuaDuAnPage() {
                       e.currentTarget.value = ""
                     }
                   }}
+                  className="bg-[#111827] border border-neutral-700 text-white"
                 />
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => document.getElementById("uploadInput")?.click()}
+                  className="border-neutral-700 text-neutral-200"
                 >
                   Tải ảnh
                 </Button>
@@ -308,7 +315,7 @@ export default function SuaDuAnPage() {
                 value={formData.trang_thai || "hoat_dong"}
                 onValueChange={(v) => setFormData({ ...formData, trang_thai: v })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-[#111827] border border-neutral-700 text-white min-w-[160px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -324,7 +331,7 @@ export default function SuaDuAnPage() {
                 {loading ? "Đang lưu..." : "Lưu thay đổi"}
               </Button>
               <Link href="/admin/du-an">
-                <Button type="button" variant="outline">
+                <Button type="button" variant="outline" className="border-neutral-700 text-neutral-200">
                   Hủy
                 </Button>
               </Link>
