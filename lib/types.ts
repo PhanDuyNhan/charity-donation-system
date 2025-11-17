@@ -112,22 +112,22 @@ export interface SuKien {
 export interface TinTuc {
   id: number
   tieu_de: string
-  duong_dan: string
+ // duong_dan: string
   noi_dung: string
-  tom_tat?: string
-  chuyen_muc: ChuyenMucTinTuc
+  //tom_tat?: string
+  //chuyen_muc: ChuyenMucTinTuc
   ma_tac_gia: number
-  trang_thai: TrangThaiNoiDung
+  //trang_thai: TrangThaiNoiDung
   anh_dai_dien?: string
-  thu_vien_anh?: any
-  the_tag?: any
-  luot_xem: number
-  la_bai_noi_bat: boolean
-  tieu_de_seo?: string
-  mo_ta_seo?: string
-  ngay_xuat_ban?: string
+  //thu_vien_anh?: any
+  //the_tag?: any
+  //luot_xem: number
+  //la_bai_noi_bat: boolean
+  //tieu_de_seo?: string
+  //mo_ta_seo?: string
+  //ngay_xuat_ban?: string
   ngay_tao: string
-  ngay_cap_nhat: string
+  //ngay_cap_nhat: string
 }
 
 export interface TinhNguyenVien {

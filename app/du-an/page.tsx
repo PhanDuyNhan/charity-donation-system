@@ -18,15 +18,84 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 
-// Hàm loại bỏ dấu để lọc chữ tiếng Việt
-function normalizeString(str: string) {
-  return str
-    ?.normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D")
-    .toLowerCase()
-    .trim()
+// Hàm loại bỏ dấu tiếng Việt và chuẩn hoá
+function normalizeString(str: string | undefined) {
+  return (
+    (str ?? "")
+      .normalize?.("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase()
+      .trim() ?? ""
+  )
+}
+
+// Lấy ảnh chính (hỗ trợ string hoặc array)
+function getFirstImage(thuvien: string | string[] | undefined): string {
+  if (!thuvien) return "/placeholder.svg"
+  if (Array.isArray(thuvien)) {
+    const first = thuvien.length > 0 ? thuvien[0] : ""
+    if (!first) return "/placeholder.svg"
+    return first.startsWith("http") ? first : `https://j2ee.oshi.id.vn${first}`
+  }
+  return thuvien.startsWith("http") ? thuvien : `https://j2ee.oshi.id.vn${thuvien}`
+}
+
+// Hàm detect tỉnh/thành từ chuỗi dia_diem dựa vào danh sách provinces
+function detectProvinceFromDiaDiem(diaDiem: string | undefined, provinces: any[]): string | null {
+  if (!diaDiem) return null
+  const text = normalizeString(diaDiem)
+
+  // 1) thử tìm bằng các trường phổ biến từ provinces
+  for (const p of provinces) {
+    const candidates: string[] = []
+    if (p.name) candidates.push(String(p.name))
+    if (p.name_with_type) candidates.push(String(p.name_with_type))
+    if (p.code) candidates.push(String(p.code))
+    // sometimes provinces API has "slug" or other fields
+    if (p.slug) candidates.push(String(p.slug))
+    for (const c of candidates) {
+      const n = normalizeString(c)
+      if (!n) continue
+      if (text.includes(n)) {
+        return p.name // trả về tên chính thức từ API (p.name)
+      }
+    }
+  }
+
+  // 2) thử các viết tắt / alias thường gặp
+  const aliases: Record<string, string> = {
+    "tp.hcm": "Thành phố Hồ Chí Minh",
+    "tphcm": "Thành phố Hồ Chí Minh",
+    "hcm": "Thành phố Hồ Chí Minh",
+    "tp.hanoi": "Hà Nội",
+    "tp.hn": "Hà Nội",
+    "hn": "Hà Nội",
+    "tp.hue": "Thừa Thiên Huế",
+    "tp.hcm.": "Thành phố Hồ Chí Minh",
+    // thêm alias nếu cần
+  }
+
+  for (const [k, v] of Object.entries(aliases)) {
+    if (text.includes(normalizeString(k))) return v
+  }
+
+  // 3) fallback: thử match phần cuối chuỗi (ví dụ "..., Lao Cai")
+  const parts = diaDiem.split(",").map((s) => normalizeString(s))
+  if (parts.length > 0) {
+    const last = parts[parts.length - 1]
+    if (last) {
+      // thử tìm province có phần normalized trùng last
+      for (const p of provinces) {
+        if (normalizeString(p.name) === last || normalizeString(p.name_with_type || "") === last) {
+          return p.name
+        }
+      }
+    }
+  }
+
+  return null
 }
 
 export default function DuAnPage() {
@@ -54,8 +123,22 @@ export default function DuAnPage() {
           apiClient.getDanhMucDuAn(),
           fetch("https://provinces.open-api.vn/api/?depth=1").then((r) => r.json()),
         ])
-        setProjects(duAnRes)
-        setFilteredProjects(duAnRes)
+
+        // detect province cho từng project
+        const enrichedProjects = (duAnRes || []).map((p: any) => {
+          const detected = detectProvinceFromDiaDiem(p.dia_diem, provRes || [])
+          return {
+            ...p,
+            // thêm trường tiêu chuẩn để filter: detectedProvince là tên tỉnh đầy đủ từ API provinces nếu tìm được
+            detectedProvince: detected, // có thể null
+            // normalize copy để filter nhanh
+            _normalized_dia_diem: normalizeString(p.dia_diem),
+            _normalized_detectedProvince: detected ? normalizeString(detected) : null,
+          }
+        })
+
+        setProjects(enrichedProjects)
+        setFilteredProjects(enrichedProjects)
         setCategories(danhMucRes)
         setProvinces(provRes)
       } catch (err) {
@@ -72,30 +155,38 @@ export default function DuAnPage() {
   useEffect(() => {
     let filtered = [...projects]
 
+    // Tìm kiếm (tiêu đề + mo_ta)
     if (search.trim()) {
       const keyword = normalizeString(search)
       filtered = filtered.filter(
         (p) =>
           normalizeString(p.tieu_de || "").includes(keyword) ||
-          normalizeString(p.mo_ta_ngan || "").includes(keyword)
+          normalizeString(p.mo_ta || "").includes(keyword)
       )
     }
 
+    // Danh mục
     if (category !== "__all") {
       filtered = filtered.filter((p) => String(p.ma_danh_muc) === category)
     }
 
+    // Địa điểm: so sánh bằng detectedProvince nếu có, nếu không thì fallback includes trên dia_diem
     if (province !== "__all") {
       const normalizedProvince = normalizeString(province)
-      filtered = filtered.filter((p) =>
-        normalizeString(p.dia_diem || "").includes(normalizedProvince)
-      )
+      filtered = filtered.filter((p) => {
+        const detectedNorm = p._normalized_detectedProvince
+        if (detectedNorm) {
+          return detectedNorm === normalizedProvince
+        }
+        // fallback: nếu detected không có -> check raw dia_diem
+        return (p._normalized_dia_diem || "").includes(normalizedProvince)
+      })
     }
 
+    // Thời gian
     if (startDate) {
       filtered = filtered.filter((p) => new Date(p.ngay_bat_dau) >= new Date(startDate))
     }
-
     if (endDate) {
       filtered = filtered.filter((p) => new Date(p.ngay_ket_thuc) <= new Date(endDate))
     }
@@ -120,7 +211,7 @@ export default function DuAnPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
+      {/* Hero & Filter UI (giữ nguyên như trước) */}
       <section className="bg-gradient-to-br from-blue-50 to-green-50 py-12">
         <div className="container mx-auto px-4 text-center mb-8">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Các Dự Án Từ Thiện</h1>
@@ -129,7 +220,6 @@ export default function DuAnPage() {
           </p>
         </div>
 
-        {/* Bộ lọc */}
         <div className="max-w-6xl mx-auto px-4">
           <div className="bg-muted/20 rounded-lg p-4 space-y-4">
             <div className="flex flex-col md:flex-row items-center gap-3">
@@ -159,7 +249,6 @@ export default function DuAnPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-              {/* Danh mục */}
               <div>
                 <label className="text-[13px] font-semibold mb-1 flex items-center gap-1">
                   <Filter className="w-4 h-4 text-primary" /> Danh mục
@@ -179,7 +268,6 @@ export default function DuAnPage() {
                 </Select>
               </div>
 
-              {/* Địa điểm */}
               <div>
                 <label className="text-[13px] font-semibold mb-1 flex items-center gap-1">
                   <MapPin className="w-4 h-4 text-primary" /> Địa điểm
@@ -199,7 +287,6 @@ export default function DuAnPage() {
                 </Select>
               </div>
 
-              {/* Ngày bắt đầu */}
               <div>
                 <label className="text-[13px] font-semibold mb-1 flex items-center gap-1">
                   <Calendar className="w-4 h-4 text-primary" /> Từ ngày
@@ -212,7 +299,6 @@ export default function DuAnPage() {
                 />
               </div>
 
-              {/* Ngày kết thúc */}
               <div>
                 <label className="text-[13px] font-semibold mb-1 flex items-center gap-1">
                   <Calendar className="w-4 h-4 text-primary" /> Đến ngày
@@ -225,7 +311,6 @@ export default function DuAnPage() {
                 />
               </div>
 
-              {/* Số dự án */}
               <div className="flex items-end justify-end">
                 <div className="bg-primary/10 text-primary font-medium text-sm px-3 py-1.5 rounded-full inline-flex items-center gap-1">
                   <Filter className="w-4 h-4" />
@@ -237,7 +322,7 @@ export default function DuAnPage() {
         </div>
       </section>
 
-      {/* Danh sách dự án */}
+      {/* Danh sách */}
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
           {filteredProjects.length === 0 ? (
@@ -251,32 +336,28 @@ export default function DuAnPage() {
                       ? (project.so_tien_hien_tai / project.so_tien_muc_tieu) * 100
                       : 0
 
+                  const mainImage = getFirstImage(project.thu_vien_anh)
+
                   return (
                     <Card
                       key={project.id}
                       className="overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col h-full"
                     >
-                      {/* Ảnh & trạng thái */}
                       <div className="relative h-48 overflow-hidden">
                         <img
-                          src={
-                            project.anh_dai_dien?.startsWith("https")
-                              ? project.anh_dai_dien
-                              : `https://j2ee.oshi.id.vn${project.anh_dai_dien}`
-                          }
+                          src={mainImage}
                           alt={project.tieu_de}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                         />
                         <Badge className="absolute top-4 right-4 bg-secondary text-white shadow-md">
-                          {project.trang_thai === "hoat_dong" ? "Đang hoạt động" : "Sắp diễn ra"}
+                          {project.trang_thai === "hoat_dong" ? "Đang hoạt động" : "Khác"}
                         </Badge>
                       </div>
 
-                      {/* Nội dung */}
                       <CardHeader className="pb-2">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                           <Badge variant="outline">
-                            {project.muc_do_uu_tien?.replace("_", " ")}
+                            Ưu tiên: {project.muc_do_yeu_tien}
                           </Badge>
                           <span className="flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
@@ -285,11 +366,10 @@ export default function DuAnPage() {
                         </div>
                         <CardTitle className="text-lg">{project.tieu_de}</CardTitle>
                         <CardDescription className="line-clamp-2">
-                          {project.mo_ta_ngan}
+                          {project.mo_ta}
                         </CardDescription>
                       </CardHeader>
 
-                      {/* Tiến độ + nút quyên góp */}
                       <CardContent className="flex flex-col justify-between flex-1 space-y-4">
                         <div className="space-y-3">
                           <div className="flex justify-between text-sm">
@@ -331,7 +411,6 @@ export default function DuAnPage() {
                 })}
               </div>
 
-              {/* Pagination */}
               {totalPages > 1 && (
                 <Pagination className="justify-center py-6">
                   <PaginationContent>

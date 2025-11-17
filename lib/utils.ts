@@ -59,3 +59,15 @@ export function isValidPhone(phone: string): boolean {
   const phoneRegex = /^(0|\+84)[0-9]{9}$/
   return phoneRegex.test(phone.replace(/\s/g, ""))
 }
+// Convert relative image path from backend → full URL
+export function getImageUrl(path?: string) {
+  if (!path) return "/placeholder.svg"
+
+  // Nếu backend trả về URL tuyệt đối (http...) thì dùng luôn
+  if (path.startsWith("http")) return path
+
+  // Nếu là đường dẫn tương đối (images/xxx.jpg) thì ghép BASE_URL
+  const BASE_URL = "https://j2ee.oshi.id.vn/api/v1"
+
+  return `${BASE_URL}/${path}`
+}
