@@ -352,6 +352,7 @@ export default function AdminQuyenGopPage() {
                 <Button variant="secondary" className="text-sm" onClick={() => { resetFilters(); }}>
                   <XCircle className="h-4 w-4 mr-2" /> Xóa bộ lọc
                 </Button>
+     
               </div>
             </div>
           </CardHeader>

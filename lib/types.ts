@@ -61,6 +61,7 @@ export interface DuAn {
   nguoi_phe_duyet?: number | null
   ngay_tao?: string
   ngay_cap_nhat?: string
+  giai_ngan?: GiaiNgan[]
 }
 
 export interface QuyenGop {
@@ -197,4 +198,38 @@ export interface UploadResponse {
   path?: string
   url?: string
   [key: string]: any
+}
+
+
+
+export interface ThongTinNguoiNhan {
+  mst?: string
+  dia_chi?: string
+  so_dien_thoai?: string
+}
+
+export interface GiaiNgan {
+  id: number
+  ghi_chu?: string
+  so_tien: number
+  ma_du_an: number
+  ngay_tao: string
+  nguoi_nhan: string
+  trang_thai: string
+  nguoi_duyet?: number | null
+  loai_giai_ngan: string
+  ngay_giai_ngan: string
+  nguoi_giai_ngan: number
+  muc_dich_su_dung: string
+  ma_tai_khoan_du_an: number
+  tai_lieu_chung_minh?: any
+  thong_tin_nguoi_nhan?: ThongTinNguoiNhan
+  chi_tiet_giai_ngan_ma_giai_ngan_fkey?: ChiTietGiaiNgan[]
+}
+
+export interface ChiTietGiaiNgan {
+  id : number,
+  mo_ta : string,
+  so_tien : number,
+  ma_giai_ngan : number
 }

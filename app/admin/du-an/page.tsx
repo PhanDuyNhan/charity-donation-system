@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { apiClient } from "@/lib/api-client"
-import type { DuAn, DanhMucDuAn, NguoiDung, QuyenGop, SuKien } from "@/lib/types"
+import type { DuAn, DanhMucDuAn, NguoiDung, QuyenGop, SuKien, GiaiNgan } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -31,6 +31,8 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card"
+import GiaiNganModal from "@/components/du-an/GiaiNganModalProps"
+import { DanhSachGiaiNganModal } from "@/components/du-an/DanhSachGiaiNganModal"
 
 //
 // helper: remove Vietnamese tones for searching
@@ -70,25 +72,36 @@ export default function AdminDuAnPage() {
   // selection state for checkboxes
   const [selectedIds, setSelectedIds] = useState<number[]>([])
 
+  const [showGiaiNganModal, setShowGiaiNganModal] = useState(false)
+  const [selectedDuAn, setSelectedDuAn] = useState<DuAn | null>(null)
+  console.log("showGiaingnaModal", showGiaiNganModal)
+  const [showDanhSachGiaiNganModal, setShowDanhSachGiaiNganModal] = useState(false)
+  const [selectedGiaiNganList, setSelectedGiaiNganList] = useState<GiaiNgan[]>([])
+  const [selectedDuAnTitle, setSelectedDuAnTitle] = useState("")
+  const [loadingGiaiNgan, setLoadingGiaiNgan] = useState(false)
+
   useEffect(() => {
     fetchAll()
     fetchDanhMuc()
-    ;(async () => {
-      try {
-        const [q, u, s] = await Promise.all([apiClient.getQuyenGop(), apiClient.getNguoiDung(), apiClient.getSuKien()])
-        setQuyenGops(Array.isArray(q) ? q : [])
-        setNguoiDungs(Array.isArray(u) ? u : [])
-        setSuKiens(Array.isArray(s) ? s : [])
-      } catch (err) {
-        console.error(err)
-      }
-    })()
+      ; (async () => {
+        try {
+          const [q, u, s] = await Promise.all([apiClient.getQuyenGop(), apiClient.getNguoiDung(), apiClient.getSuKien()])
+          setQuyenGops(Array.isArray(q) ? q : [])
+          setNguoiDungs(Array.isArray(u) ? u : [])
+          setSuKiens(Array.isArray(s) ? s : [])
+        } catch (err) {
+          console.error(err)
+        }
+      })()
   }, [])
 
   async function fetchAll() {
     setLoading(true)
     try {
-      const res = await apiClient.getDuAn()
+      const paramsToFetch = {
+        select: "*,giai_ngan(*)"
+      };
+      const res = await apiClient.getDuAn(paramsToFetch)
       console.log("ressssssssssssssss", res)
       setDuAns(Array.isArray(res) ? res : [])
     } catch (err) {
@@ -222,6 +235,39 @@ export default function AdminDuAnPage() {
     }
   }
 
+  // open Giai Ngan modal
+  function openGiaiNganModal(duAn: DuAn) {
+    setSelectedDuAn(duAn)
+    setShowGiaiNganModal(true)
+  }
+
+  // open modal chi tiet giai ngan 
+  async function openDanhSachGiaiNganModal(duAn: DuAn) {
+    setLoadingGiaiNgan(true)
+    try {
+      // Gọi API để lấy danh sách giải ngân của dự án
+      const response = await apiClient.getChiTietGiaiNgan({
+        ma_du_an: `eq.${duAn.id}`,
+        select: '*,chi_tiet_giai_ngan_ma_giai_ngan_fkey(*)'
+      })
+
+      console.log("Danh sách giải ngân:", response)
+
+      if (response && Array.isArray(response) && response.length > 0) {
+        setSelectedGiaiNganList(response)
+        setSelectedDuAnTitle(duAn.tieu_de)
+        setShowDanhSachGiaiNganModal(true)
+      } else {
+        alert('Dự án này chưa có giải ngân nào')
+      }
+    } catch (err) {
+      console.error('Lỗi khi lấy thông tin giải ngân:', err)
+      alert('Không thể lấy thông tin giải ngân')
+    } finally {
+      setLoadingGiaiNgan(false)
+    }
+  }
+
   function exportSelectedToCSV() {
     if (selectedIds.length === 0) {
       alert("Chưa chọn dự án nào để xuất.")
@@ -259,6 +305,34 @@ export default function AdminDuAnPage() {
     return { total, hoat_dong, hoan_thanh, tam_dung }
   }, [duAns])
 
+
+  // handle Giai Ngan
+  async function handleGiaiNgan(data: any) {
+    try {
+      // Gọi API giải ngân
+      const response = await apiClient.createGiaiNgan(data) 
+      alert("Giải ngân thành công!")
+      fetchAll() 
+      return response;
+    } catch (err) {
+      console.error("Lỗi giải ngân:", err)
+      throw err
+    }
+  }
+
+  async function handleChiTietGiaiNgan(data: any) {
+    try {
+      // Gọi API giải ngân
+      const response = await apiClient.createChiTietGiaiNgan(data) // Thay bằng API thực tế của bạn
+      // fetchAll() // Tải lại danh sách dự án
+      return response;
+    } catch (err) {
+      console.error("Lỗi giải ngân:", err)
+      throw err
+    }
+  }
+
+
   return (
     <div className="min-h-[calc(100vh-48px)] p-6 bg-[#111827] text-white">
       <div className="max-w-[1280px] mx-auto space-y-6">
@@ -269,9 +343,7 @@ export default function AdminDuAnPage() {
             <Button onClick={openCreate} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg">
               <Plus className="h-4 w-4" /> Thêm dự án
             </Button>
-            <Button variant="ghost" className="border border-neutral-700 text-neutral-200 hover:bg-[#1f2937]" onClick={fetchAll}>
-              Tải lại
-            </Button>
+           
           </div>
         </div>
 
@@ -408,10 +480,7 @@ export default function AdminDuAnPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="ghost" className="border border-neutral-700 text-neutral-200 hover:bg-[#1f2937]" onClick={fetchAll}>
-                Tải lại
-              </Button>
-
+        
               {/* Bulk actions */}
               <div className="flex items-center gap-2">
                 <Button size="sm" onClick={exportSelectedToCSV} disabled={!isSomeSelected} className="text-sm" >
@@ -437,9 +506,14 @@ export default function AdminDuAnPage() {
                     </th>
                     <th className="py-3 px-6">Tiêu đề</th>
                     <th className="py-3 px-6">Danh mục</th>
-                    <th className="py-3 px-6">Ngày bắt đầu</th>
-                    <th className="py-3 px-6">Ngày kết thúc</th>
+                    {/* <th className="py-3 px-6">Ngày bắt đầu</th> */}
+                    {/* <th className="py-3 px-6">Ngày kết thúc</th> */}
+                    <th className="py-3 px-6">Thời gian</th>
+
                     <th className="py-3 px-6">Mục tiêu</th>
+                    <th className="py-3 px-6">Số tiền quyên góp hiện tại</th>
+                    <th className="py-3 px-6">Số tiền đã giải ngân</th>
+
                     <th className="py-3 px-6">Trạng thái</th>
                     <th className="py-3 px-6 text-center">Hành động</th>
                   </tr>
@@ -458,7 +532,7 @@ export default function AdminDuAnPage() {
                     </tr>
                   ) : (
                     paginated.map((d) => (
-                      <tr key={d.id} className="border-b border-neutral-700 hover:bg-[#0b1220] transition-colors">
+                      <tr key={d.id} className="border-b border-neutral-700 hover:bg-[#0b1220] transition-colors text-neutral-300"> {/* Áp dụng màu chữ nhạt cho toàn bộ hàng */}
                         <td className="py-3 px-4">
                           <Checkbox
                             checked={selectedIds.includes(Number(d.id))}
@@ -467,26 +541,43 @@ export default function AdminDuAnPage() {
                         </td>
 
                         {/* HoverCard around title (truncate + preview) */}
-                        <td className="py-3 px-6 max-w-[260px]">
+                        <td className="py-3 px-6 max-w-[200px] text-base font-medium"> {/* Giữ tiêu đề rõ ràng */}
                           <HoverCard>
                             <HoverCardTrigger>
-                              <div className="truncate cursor-help">{d.tieu_de}</div>
+                              <div className="truncate cursor-help text-xs">{d.tieu_de}</div>
                             </HoverCardTrigger>
-                            <HoverCardContent className="w-72 p-3">
+                            <HoverCardContent className="w-72 p-3 bg-neutral-800 border-neutral-700 shadow-xl"> {/* Tăng độ tương phản cho HoverCard */}
                               <p className="text-sm text-neutral-200">{d.mo_ta ?? "Không có mô tả"}</p>
-                              <div className="mt-2 text-xs text-neutral-400">Người tạo: {d.nguoi_tao ?? "—"}</div>
-                              <div className="text-xs text-neutral-400">ID: {d.id}</div>
+                              <div className="mt-2 text-xs text-neutral-400 font-light">Người tạo: {d.nguoi_tao ?? "—"}</div> {/* Chữ nhỏ hơn, mỏng hơn */}
+                              <div className="text-xs text-neutral-400 font-light">ID: {d.id}</div> {/* Chữ nhỏ hơn, mỏng hơn */}
                             </HoverCardContent>
                           </HoverCard>
                         </td>
 
-                        <td className="py-3 px-6">{getCategoryName(d.ma_danh_muc)}</td>
-                        <td className="py-3 px-6">{d.ngay_bat_dau}</td>
-                        <td className="py-3 px-6">{d.ngay_ket_thuc}</td>
-                        <td className="py-3 px-6">{Number(d.so_tien_muc_tieu || 0).toLocaleString()}</td>
+                        <td className="py-3 px-6 text-xs">{getCategoryName(d.ma_danh_muc)}</td> {/* Cột Danh mục - làm nhỏ hơn */}
+                        <td className="py-3 px-6 text-xs">{d.ngay_bat_dau} {'->'} {d.ngay_ket_thuc}</td> {/* Cột Ngày - làm nhỏ hơn và mỏng hơn */}
+                        <td className="py-3 px-6 text-xs">{Number(d.so_tien_muc_tieu || 0).toLocaleString()}</td> {/* Cột Số tiền - làm nhỏ hơn, dùng font monospace để căn chỉnh số đẹp hơn */}
+                        <td className="py-3 px-6 text-xs">{Number(d.so_tien_hien_tai || 0).toLocaleString()}</td> {/* Cột Số tiền hiện tại - làm nhỏ hơn, màu nổi bật */}
+                        <td className="py-3 px-6 text-xs">
+                          {d?.giai_ngan && d.giai_ngan.length > 0 ? (
+
+                            Number(
+                              (d?.giai_ngan?.reduce((sum, item) => sum + (item.so_tien || 0), 0) || 0)
+                            ).toLocaleString()
+                          ) : 
+                            Number(d?.so_tien_hien_tai).toLocaleString()
+                          }
+                        </td>
+
                         <td className="py-3 px-6">
-                          <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${d.trang_thai === "hoat_dong" ? "bg-green-700" : d.trang_thai === "hoan_thanh" ? "bg-neutral-600" : d.trang_thai === "tam_dung" ? "bg-yellow-600 text-black" : "bg-neutral-700"}`}>
-                            {d.trang_thai}
+                          <span className={`inline-block px-2 py-0.5 text-[8px] uppercase font-semibold rounded-full 
+        whitespace-nowrap {/* <--- THÊM CLASS NÀY */}
+        ${d.trang_thai === "hoat_dong" ? "bg-green-700 text-green-50"
+                              : d.trang_thai === "hoan_thanh" ? "bg-neutral-600 text-neutral-50"
+                                : d.trang_thai === "tam_dung" ? "bg-yellow-600 text-neutral-900"
+                                  : "bg-neutral-700 text-neutral-300"}`}
+                          >
+                            {d.trang_thai ? d.trang_thai.replace('_', ' ') : "—"}
                           </span>
                         </td>
 
@@ -496,15 +587,24 @@ export default function AdminDuAnPage() {
                             <DropdownMenuTrigger asChild>
                               <Button size="sm" variant="ghost" className="px-2">⋯</Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem onSelect={() => openEdit(d)}>
-                                <div className="flex items-center gap-2"><Edit2 className="h-4 w-4" /> Sửa</div>
+                            <DropdownMenuContent className="bg-neutral-800 border-neutral-700"> {/* Áp dụng màu nền tối cho dropdown */}
+
+                              <DropdownMenuItem onSelect={() => handleDelete(d)} className="focus:bg-neutral-700">
+                                <div className="flex items-center gap-2 text-red-400 text-sm"><Trash2 className="h-4 w-4" /> Xóa</div>
                               </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => handleDelete(d)}>
-                                <div className="flex items-center gap-2 text-red-400"><Trash2 className="h-4 w-4" /> Xóa</div>
+
+                              <DropdownMenuItem
+                                onSelect={() => openDanhSachGiaiNganModal(d)}
+                                className="text-neutral-200 text-sm focus:bg-neutral-700"
+                                disabled={loadingGiaiNgan}
+                              >
+                                <div className="flex items-center gap-2">
+                                {loadingGiaiNgan ? 'Đang tải...' : 'Chi tiết'}
+                                </div>
                               </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => router.push(`/du-an/${d.id}`)}>
-                                Xem chi tiết
+
+                              <DropdownMenuItem onSelect={() => openGiaiNganModal(d)}className="text-neutral-200 text-sm focus:bg-neutral-700">
+                                Giải ngân
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -541,6 +641,33 @@ export default function AdminDuAnPage() {
           </CardContent>
         </Card>
       </div>
+
+
+      {/* Modal Giải ngân */}
+      {showGiaiNganModal && selectedDuAn && (
+        <GiaiNganModal
+          isOpen={showGiaiNganModal}
+          onClose={() => setShowGiaiNganModal(false)}
+          duAnId={Number(selectedDuAn.id)}
+          duAnTitle={selectedDuAn.tieu_de}
+          onSubmit={handleGiaiNgan}
+          onSubmitChiTiet={handleChiTietGiaiNgan}
+        />
+      )}
+
+      {showDanhSachGiaiNganModal && (
+        <DanhSachGiaiNganModal
+          isOpen={showDanhSachGiaiNganModal}
+          onClose={() => {
+            setShowDanhSachGiaiNganModal(false)
+            setSelectedGiaiNganList([])
+            setSelectedDuAnTitle("")
+          }}
+          giaiNgans={selectedGiaiNganList}
+          duAnTitle={selectedDuAnTitle}
+        />
+      )}
+
     </div>
   )
 }

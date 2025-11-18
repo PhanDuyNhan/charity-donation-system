@@ -9,6 +9,7 @@ import type {
   TinhNguyenVien,
   DanhMucDuAn,
   UploadResponse,
+  GiaiNgan,
 } from "./types"
 
 /**
@@ -153,7 +154,7 @@ export class ApiClient {
 
   static async register(data: any): Promise<any> {
     const ep = getEndpoint("AUTH_REGISTER", "auth/register")
-    return this.post(ep, data) 
+    return this.post(ep, data)
   }
 
   // ==================== NGƯỜI DÙNG ====================
@@ -338,6 +339,36 @@ export class ApiClient {
     const basePath = getEndpoint("QUYEN_GOP", "quyen_gop")
     return this.post(basePath, data);
   }
+
+
+  // ==================== Giải ngân =================================================================
+  static async createGiaiNgan(data: any): Promise<any> {
+    const ep = getEndpoint("GIAI_NGAN", "giai_ngan")
+    return this.post<any>(ep, data)
+  }
+
+  // create
+  static async createChiTietGiaiNgan(data: any): Promise<any> {
+    const ep = getEndpoint("CHI_TIET_GIAI_NGAN", "chi_tiet_giai_ngan")
+    return this.post<any>(ep, data)
+  }
+
+
+  // get Chi Tiet Giải ngân
+  static async getChiTietGiaiNgan(params?: Record<string, any>): Promise<GiaiNgan[]> {
+    const basePath = getEndpoint("GIAI_NGAN", "giai_ngan")
+    return this.get<GiaiNgan[]>(basePath, params)
+  }
+
+  // update trang thái giải ngân 
+
+   static async updateTrangThaiGiaiNgan(giaiNganId: number, data: any): Promise<any> {
+    const baseUrl = getEndpoint("giai_ngan", "giai_ngan")
+    const endpointWithQuery = `${baseUrl}?id=eq.${giaiNganId}`;
+    console.log(`PATCH URL: ${endpointWithQuery}`);
+    return this.patch<any>(endpointWithQuery, data);
+  }
+
 }
 
 export const apiClient = ApiClient
