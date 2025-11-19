@@ -1,84 +1,56 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { apiClient } from "@/lib/api-client"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar as CalendarIcon, Download, Filter, SunMoon } from "lucide-react"
+import { Calendar as CalendarIcon, Download, Filter, TrendingUp, TrendingDown, Users, DollarSign, Target, Activity, BarChart3, PieChart, Clock, MapPin, Award, Zap, RefreshCw, FileSpreadsheet, FileText, AlertCircle } from "lucide-react"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { apiClient } from "@/lib/api-client"
 import type { QuyenGop, DuAn, NguoiDung } from "@/lib/types"
 
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-
-import * as XLSX from "xlsx"
-import jsPDF from "jspdf"
-import autoTable from "jspdf-autotable"
-
-import {
-  Chart as ChartJS,
-  BarElement,
-  CategoryScale,
-  LinearScale,
-  ArcElement,
-  PointElement,
-  LineElement,
-  Tooltip,
-  Legend,
-  Filler
-} from "chart.js"
-
-import { Bar, Pie, Line } from "react-chartjs-2"
-
-ChartJS.register(BarElement, CategoryScale, LinearScale, ArcElement, PointElement, LineElement, Tooltip, Legend, Filler)
-
-/**
- * PRO Dashboard - Auto theme (system)
- * - UI improved: subtle gradients, shadows, hover, animations
- * - Export Excel: multiple sheets (Top Projects, Top Donors, Provinces)
- * - Export PDF: landscape with header and multiple tables
- * - Auto theme detection (system) and dynamic chart colors
- *
- * Drop-in replacement for app/admin/bao-cao/page.tsx
- */
-
-function useAnimatedNumber(value: number, ms = 900) {
+// Improved animated number hook: no dependency loop, uses a ref to keep previous value
+function useAnimatedNumber(value: number, ms = 1200) {
   const [n, setN] = useState(0)
+  const rafRef = useRef<number | null>(null)
+  const fromRef = useRef<number>(0)
+
   useEffect(() => {
-    let raf = 0
-    const start = performance.now()
-    const from = n
+    const startTs = performance.now()
+    const from = fromRef.current
     const to = value
+
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+
     const loop = (t: number) => {
-      const p = Math.min(1, (t - start) / ms)
-      const eased = 1 - (1 - p) * (1 - p) // easeOutQuad-ish
+      const p = Math.min(1, (t - startTs) / ms)
+      const eased = 1 - Math.pow(1 - p, 3)
       setN(Math.round(from + (to - from) * eased))
-      if (p < 1) raf = requestAnimationFrame(loop)
+      if (p < 1) {
+        rafRef.current = requestAnimationFrame(loop)
+      } else {
+        fromRef.current = to
+      }
     }
-    raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value])
+
+    rafRef.current = requestAnimationFrame(loop)
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+    // only re-run when the target value or duration changes
+  }, [value, ms])
+
   return n
 }
 
 export default function AdminBaoCaoPage() {
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [fromDate, setFromDate] = useState<Date | undefined>()
   const [toDate, setToDate] = useState<Date | undefined>()
-
-  const [isDark, setIsDark] = useState<boolean>(() =>
-    typeof window !== "undefined" ? window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches : false
-  )
-
-  // watch system theme
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const mq = window.matchMedia("(prefers-color-scheme: dark)")
-    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches)
-    mq.addEventListener?.("change", handler)
-    return () => mq.removeEventListener?.("change", handler)
-  }, [])
+  const [selectedProjectId, setSelectedProjectId] = useState<number | "all">("all")
+  const [selectedUserId, setSelectedUserId] = useState<number | "all">("all")
 
   const [data, setData] = useState<{
     quyenGop: QuyenGop[]
@@ -90,43 +62,53 @@ export default function AdminBaoCaoPage() {
     nguoiDung: [],
   })
 
-  const [selectedProjectId, setSelectedProjectId] = useState<number | "all">("all")
-  const [selectedUserId, setSelectedUserId] = useState<number | "all">("all")
-
   const [thongKe, setThongKe] = useState<any>(null)
 
-  useEffect(() => { void fetchAll() }, []) // initial load
+  useEffect(() => {
+    fetchAll()
+  }, [])
 
   useEffect(() => {
-    // recompute every time filters change
-    computeStats(data.quyenGop, data.duAn, data.nguoiDung)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (data.quyenGop.length > 0) {
+      computeStats()
+    }
   }, [fromDate, toDate, selectedProjectId, selectedUserId, data])
 
   const fetchAll = async () => {
     setLoading(true)
+    setError(null)
     try {
       const [quyenGop, duAn, nguoiDung] = await Promise.all([
         apiClient.getQuyenGop(),
         apiClient.getDuAn(),
         apiClient.getNguoiDung(),
       ])
+
+      console.log('Fetched data:', { quyenGop, duAn, nguoiDung })
+
       setData({ quyenGop, duAn, nguoiDung })
-      computeStats(quyenGop, duAn, nguoiDung)
-    } catch (err) {
+      computeStatsWithData(quyenGop, duAn, nguoiDung)
+    } catch (err: any) {
       console.error("Fetch error:", err)
+      setError(err.message || "Không thể tải dữ liệu")
     } finally {
       setLoading(false)
     }
   }
 
+  // make date filter inclusive (start of fromDate, end of toDate)
   const filterByDate = (list: any[]) => {
     if (!fromDate && !toDate) return list
+    const fromStart = fromDate ? new Date(fromDate) : null
+    if (fromStart) fromStart.setHours(0, 0, 0, 0)
+    const toEnd = toDate ? new Date(toDate) : null
+    if (toEnd) toEnd.setHours(23, 59, 59, 999)
+
     return list.filter((item) => {
       const d = item?.ngay_tao ? new Date(item.ngay_tao) : null
       if (!d) return false
-      if (fromDate && d < fromDate) return false
-      if (toDate && d > toDate) return false
+      if (fromStart && d < fromStart) return false
+      if (toEnd && d > toEnd) return false
       return true
     })
   }
@@ -138,477 +120,552 @@ export default function AdminBaoCaoPage() {
     return out
   }
 
-  const computeStats = (quyenGop: QuyenGop[], duAn: DuAn[], nguoiDung: NguoiDung[]) => {
+  const computeStats = () => {
+    computeStatsWithData(data.quyenGop, data.duAn, data.nguoiDung)
+  }
+
+  const computeStatsWithData = (quyenGop: QuyenGop[], duAn: DuAn[], nguoiDung: NguoiDung[]) => {
     let qg = filterByDate(quyenGop)
     qg = applySelectionFilters(qg)
 
     const tongQuyenGop = qg.reduce((s, x) => s + (Number(x.so_tien) || 0), 0)
     const tongDuAn = duAn.length
     const tongNguoiDung = nguoiDung.length
+    const soGiaoDich = qg.length
 
-    // per-month
+    // Monthly data
     const byMonth: Record<string, number> = {}
     qg.forEach((x) => {
       const m = x.ngay_tao?.slice(0, 7) || "unknown"
       byMonth[m] = (byMonth[m] || 0) + (Number(x.so_tien) || 0)
     })
 
-    // projects by status
+    // Project status
     const projectsByStatus: Record<string, number> = {}
     duAn.forEach((d) => {
       const st = d.trang_thai || "khac"
       projectsByStatus[st] = (projectsByStatus[st] || 0) + 1
     })
 
-    // province aggregation (heuristic: last comma part)
+    // Province data
     const provinceMap: Record<string, number> = {}
-    const extractProvince = (txt?: string) => {
-      if (!txt) return "Không rõ"
-      const parts = txt.split(",").map(s => s.trim()).filter(Boolean)
-      return parts.length ? parts[parts.length - 1] : txt
-    }
     qg.forEach((x) => {
       const project = duAn.find((d) => d.id === x.ma_du_an)
-      const prov = extractProvince(project?.dia_diem)
+      const prov = project?.dia_diem?.split(",").pop()?.trim() || "Không rõ"
       provinceMap[prov] = (provinceMap[prov] || 0) + (Number(x.so_tien) || 0)
     })
 
-    // top projects
+    // Top projects
     const topProjMap: Record<number, number> = {}
     qg.forEach((x) => {
       topProjMap[x.ma_du_an] = (topProjMap[x.ma_du_an] || 0) + (Number(x.so_tien) || 0)
     })
-
-    const duAnMap: Record<number, string> = duAn.reduce((acc, x) => {
-      acc[x.id] = x.tieu_de
-      return acc
-    }, {} as Record<number, string>)
-
     const topDuAnList = Object.entries(topProjMap)
-      .map(([id, val]) => ({ id: Number(id), tieu_de: duAnMap[Number(id)] || `Dự án ${id}`, so_tien: val }))
+      .map(([id, val]) => ({
+        id: Number(id),
+        tieu_de: duAn.find(d => d.id === Number(id))?.tieu_de || `Dự án ${id}`,
+        so_tien: val
+      }))
       .sort((a, b) => b.so_tien - a.so_tien)
-      .slice(0, 10)
+      .slice(0, 5)
 
-    // top donors
+    // Top donors
     const topDonorMap: Record<number, number> = {}
     qg.forEach((x) => {
       if (!x.ma_nguoi_dung) return
       topDonorMap[x.ma_nguoi_dung] = (topDonorMap[x.ma_nguoi_dung] || 0) + (Number(x.so_tien) || 0)
     })
-
-    const userMap: Record<number, string> = nguoiDung.reduce((acc, x) => {
-      acc[x.id] = (x.ten || `${x.ho || ""} ${x.ten || ""}`).trim() || `User ${x.id}`
-      return acc
-    }, {} as Record<number, string>)
-
     const topNguoiList = Object.entries(topDonorMap)
-      .map(([uid, total]) => ({ uid: Number(uid), ten: userMap[Number(uid)] || `User ${uid}`, so_tien: total }))
+      .map(([uid, total]) => ({
+        uid: Number(uid),
+        ten: nguoiDung.find(u => u.id === Number(uid))?.ten || `User ${uid}`,
+        so_tien: total
+      }))
       .sort((a, b) => b.so_tien - a.so_tien)
-      .slice(0, 10)
+      .slice(0, 5)
 
-    // heatmap per day
-    const heatmapCounts: Record<number, number> = {}
-    qg.forEach((x) => {
-      const d = x.ngay_tao ? new Date(x.ngay_tao) : null
-      if (!d) return
-      const day = d.getDate()
-      heatmapCounts[day] = (heatmapCounts[day] || 0) + (Number(x.so_tien) || 0)
-    })
+    // Growth calculation (defensive)
+    const currentMonth = new Date().toISOString().slice(0, 7)
+    const lastMonth = new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().slice(0, 7)
+    const currentMonthAmount = byMonth[currentMonth] || 0
+    const lastMonthAmount = byMonth[lastMonth] || 0
+    const growthRate = lastMonthAmount ? ((currentMonthAmount - lastMonthAmount) / lastMonthAmount * 100) : (currentMonthAmount > 0 ? 100 : 0)
 
     setThongKe({
       tongQuyenGop,
       tongDuAn,
       tongNguoiDung,
+      soGiaoDich,
       byMonth,
       projectsByStatus,
       provinceMap,
       topDuAnList,
       topNguoiList,
-      heatmapCounts,
+      growthRate,
+      currentMonthAmount,
+      lastMonthAmount,
+      avgDonation: soGiaoDich ? tongQuyenGop / soGiaoDich : 0
     })
   }
 
-  const animatedTotal = useAnimatedNumber(thongKe?.tongQuyenGop || 0, 900)
-
-  // EXCEL: export multiple sheets
-  const exportExcel = () => {
-    if (!thongKe) return
-    const wb = XLSX.utils.book_new()
-    // Top projects
-    const topProjects = (thongKe.topDuAnList || []).map((p: any) => ({ Dự_án: p.tieu_de, So_tien: p.so_tien }))
-    const ws1 = XLSX.utils.json_to_sheet(topProjects)
-    XLSX.utils.book_append_sheet(wb, ws1, "Top_Projects")
-    // Top donors
-    const topDonors = (thongKe.topNguoiList || []).map((d: any) => ({ Ten: d.ten, So_tien: d.so_tien }))
-    const ws2 = XLSX.utils.json_to_sheet(topDonors)
-    XLSX.utils.book_append_sheet(wb, ws2, "Top_Donors")
-    // Provinces
-    const provinces = Object.entries(thongKe.provinceMap || {}).map(([k, v]) => ({ Tinh: k, So_tien: v }))
-    const ws3 = XLSX.utils.json_to_sheet(provinces)
-    XLSX.utils.book_append_sheet(wb, ws3, "Provinces")
-    // Write file
-    XLSX.writeFile(wb, "bao_cao_pro.xlsx")
-  }
-
-  // PDF: multiple tables with header
-  const exportPDF = () => {
-    if (!thongKe) return
-    const doc = new jsPDF({ orientation: "landscape" })
-    const title = "BÁO CÁO THỐNG KÊ"
-    const now = new Date().toLocaleString()
-    doc.setFontSize(18)
-    doc.text(title, 14, 14)
-    doc.setFontSize(10)
-    doc.text(`Ngày xuất: ${now}`, 14, 20)
-
-    // Top projects table
-    autoTable(doc, {
-      startY: 28,
-      head: [["Dự án", "Số tiền"]],
-      body: (thongKe.topDuAnList || []).map((p: any) => [p.tieu_de, formatVND(p.so_tien)]),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [30, 144, 255] },
-    })
-
-    // Next table: top donors
-    const afterFirst = (doc as any).lastAutoTable.finalY || 28
-    autoTable(doc, {
-      startY: afterFirst + 8,
-      head: [["Người", "Số tiền"]],
-      body: (thongKe.topNguoiList || []).map((d: any) => [d.ten, formatVND(d.so_tien)]),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [16, 185, 129] },
-    })
-
-    // Next: provinces (if there is space, else new page)
-    const afterSecond = (doc as any).lastAutoTable.finalY || afterFirst + 8
-    autoTable(doc, {
-      startY: afterSecond + 8,
-      head: [["Tỉnh/Thành", "Số tiền"]],
-      body: Object.entries(thongKe.provinceMap || {}).map(([k, v]) => [k, formatVND(Number(v))]),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [99, 102, 241] },
-    })
-
-    doc.save("bao_cao_pro.pdf")
-  }
-
-  // Chart data via memo
-  const lineData = useMemo(() => {
-    const labels = thongKe ? Object.keys(thongKe.byMonth || {}).sort() : []
-    return {
-      labels,
-      datasets: [
-        {
-          label: "Tổng quyên góp",
-          data: labels.map((l) => thongKe.byMonth[l] || 0),
-          borderColor: isDark ? "#34d399" : "#0ea5a4",
-          backgroundColor: isDark ? "rgba(52,211,153,0.08)" : "rgba(14,165,164,0.08)",
-          fill: true,
-          tension: 0.35,
-          pointRadius: 3,
-        },
-      ],
-    }
-  }, [thongKe, isDark])
-
-  const doughnutData = useMemo(() => {
-    const labels = thongKe ? Object.keys(thongKe.projectsByStatus || {}) : []
-    const values = labels.map((l) => thongKe.projectsByStatus[l])
-    const colors = isDark ? ["#06b6d4", "#7c3aed", "#f59e0b", "#10b981", "#ef4444"] : ["#06b6d4", "#3b82f6", "#f59e0b", "#10b981", "#ef4444"]
-    return { labels, datasets: [{ data: values, backgroundColor: colors.slice(0, labels.length) }] }
-  }, [thongKe, isDark])
-
-  const provinceBarData = useMemo(() => {
-    const entries = thongKe ? Object.entries(thongKe.provinceMap || {}).sort((a: any, b: any) => b[1] - a[1]) : []
-    const labels = entries.map((e) => e[0])
-    const dataVals = entries.map((e) => e[1])
-    return { labels, datasets: [{ label: "Tổng quyên góp", data: dataVals, backgroundColor: isDark ? "#60a5fa" : "#2563eb" }] }
-  }, [thongKe, isDark])
-
-  const heatmapMax = useMemo(() => {
-    if (!thongKe) return 1
-    const vals = Object.values(thongKe.heatmapCounts || {}).map(Number)
-    return Math.max(1, ...vals)
-  }, [thongKe])
+  const animatedTotal = useAnimatedNumber(thongKe?.tongQuyenGop || 0, 1200)
+  const animatedProjects = useAnimatedNumber(thongKe?.tongDuAn || 0, 800)
+  const animatedUsers = useAnimatedNumber(thongKe?.tongNguoiDung || 0, 900)
+  const animatedTransactions = useAnimatedNumber(thongKe?.soGiaoDich || 0, 1000)
 
   if (loading) {
     return (
-      <div className="min-h-[420px] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin h-12 w-12 border-4 border-dashed rounded-full border-primary/30 border-t-primary mx-auto mb-4" />
-          <div className="text-muted-foreground">Đang tải dữ liệu...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-gray-900 to-indigo-900 p-6 text-slate-200">
+        <div className="text-center space-y-6">
+          <div className="relative">
+            <div className="w-24 h-24 border-8 border-gray-700 border-t-indigo-500 rounded-full animate-spin mx-auto" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <BarChart3 className="w-10 h-10 text-indigo-300 animate-pulse" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="text-2xl font-bold text-slate-100">Đang tải dữ liệu...</div>
+            <div className="text-slate-400">Vui lòng chờ trong giây lát</div>
+          </div>
         </div>
       </div>
     )
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-gray-900 to-indigo-900 p-6">
+        <Card className="max-w-md w-full border-2 border-red-700 shadow-xl bg-slate-800">
+          <CardContent className="pt-6 text-slate-200">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-red-800 rounded-full flex items-center justify-center mx-auto">
+                <AlertCircle className="w-8 h-8 text-red-300" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold">Lỗi tải dữ liệu</h3>
+                <p className="text-slate-300">{error}</p>
+              </div>
+              <Button onClick={fetchAll} className="w-full bg-indigo-600 hover:bg-indigo-700">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Thử lại
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
-    <div className={`space-y-6 p-6 transition-colors duration-300 ${isDark ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"}`}>
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Báo cáo & Thống kê</h1>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-muted/10">
-            <SunMoon size={16} />
-            <div className="text-sm">{isDark ? "Dark (system)" : "Light (system)"}</div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-indigo-950 p-6 text-slate-100">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="space-y-1">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-300 to-white/90 bg-clip-text text-transparent">
+              Báo Cáo & Thống Kê
+            </h1>
+            <p className="text-slate-400">Tổng quan hoạt động quyên góp và dự án từ thiện</p>
           </div>
 
-          <Button variant="ghost" onClick={exportExcel} className="flex items-center gap-2">
-            <Download size={16} /> Xuất Excel
-          </Button>
-          <Button onClick={exportPDF} className="flex items-center gap-2">
-            <Download size={16} /> Xuất PDF
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={fetchAll}
+              className="flex items-center gap-2 border-2 border-slate-700 hover:border-indigo-400 hover:bg-indigo-800"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Làm mới
+            </Button>
+            <Button
+              variant="outline"
+              className="flex items-center gap-2 border-2 border-slate-700 hover:border-emerald-400 hover:bg-emerald-900"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Excel
+            </Button>
+            <Button
+              className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-900 hover:from-indigo-700 hover:to-indigo-950"
+            >
+              <FileText className="w-4 h-4" />
+              PDF
+            </Button>
+          </div>
         </div>
+
+        {/* Filters */}
+        <Card className="border-2 shadow-lg hover:shadow-xl transition-all duration-300 bg-slate-800 border-slate-700">
+          <CardHeader className="bg-gradient-to-r from-slate-800 to-indigo-900">
+            <CardTitle className="flex items-center gap-2 text-indigo-100">
+              <Filter className="w-5 h-5" />
+              Bộ Lọc Dữ Liệu
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal border-2 border-slate-700 hover:border-indigo-400">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {fromDate ? fromDate.toLocaleDateString('vi-VN') : "Từ ngày"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent mode="single" selected={fromDate} onSelect={setFromDate} />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal border-2 border-slate-700 hover:border-indigo-400">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {toDate ? toDate.toLocaleDateString('vi-VN') : "Đến ngày"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent mode="single" selected={toDate} onSelect={setToDate} />
+                </PopoverContent>
+              </Popover>
+
+              <Select value={String(selectedProjectId)} onValueChange={(v) => setSelectedProjectId(v === "all" ? "all" : Number(v))}>
+                <SelectTrigger className="border-2 border-slate-700 hover:border-indigo-400">
+                  <SelectValue placeholder="Chọn dự án" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 text-slate-100">
+                  <SelectItem value="all">Tất cả dự án</SelectItem>
+                  {data.duAn.map((d) => (
+                    <SelectItem key={d.id} value={String(d.id)}>{d.tieu_de}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={String(selectedUserId)} onValueChange={(v) => setSelectedUserId(v === "all" ? "all" : Number(v))}>
+                <SelectTrigger className="border-2 border-slate-700 hover:border-indigo-400">
+                  <SelectValue placeholder="Chọn người dùng" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 text-slate-100">
+                  <SelectItem value="all">Tất cả người dùng</SelectItem>
+                  {data.nguoiDung.map((u) => (
+                    <SelectItem key={u.id} value={String(u.id)}>{u.ho} {u.ten}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Filters */}
-      <Card className="shadow-md hover:shadow-lg transition-shadow">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarIcon /> Bộ lọc dữ liệu
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <KPICard
+          title="Tổng Quyên Góp"
+          value={formatVND(animatedTotal)}
+          icon={<DollarSign className="w-8 h-8" />}
+          gradient="from-emerald-600 to-teal-700"
+          trend={thongKe?.growthRate || 0}
+          subtitle="So với tháng trước"
+        />
+        <KPICard
+          title="Số Dự Án"
+          value={animatedProjects.toString()}
+          icon={<Target className="w-8 h-8" />}
+          gradient="from-blue-600 to-indigo-700"
+          subtitle="Dự án đang hoạt động"
+        />
+        <KPICard
+          title="Người Dùng"
+          value={animatedUsers.toString()}
+          icon={<Users className="w-8 h-8" />}
+          gradient="from-purple-600 to-pink-700"
+          subtitle="Người dùng đã đăng ký"
+        />
+        <KPICard
+          title="Giao Dịch"
+          value={animatedTransactions.toString()}
+          icon={<Activity className="w-8 h-8" />}
+          gradient="from-orange-600 to-red-700"
+          subtitle="Giao dịch thành công"
+        />
+      </div>
+
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Monthly Trend */}
+        <Card className="lg:col-span-2 border-2 shadow-lg hover:shadow-xl transition-all bg-slate-800 border-slate-700">
+          <CardHeader className="bg-gradient-to-r from-slate-800 to-indigo-900">
+            <CardTitle className="flex items-center gap-2 text-indigo-100">
+              <TrendingUp className="w-5 h-5" />
+              Xu Hướng Quyên Góp Theo Tháng
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <MonthlyChart data={thongKe?.byMonth || {}} />
+          </CardContent>
+        </Card>
+
+        {/* Project Status */}
+        <Card className="border-2 shadow-lg hover:shadow-xl transition-all bg-slate-800 border-slate-700">
+          <CardHeader className="bg-gradient-to-r from-purple-800 to-pink-900">
+            <CardTitle className="flex items-center gap-2 text-pink-100">
+              <PieChart className="w-5 h-5" />
+              Trạng Thái Dự Án
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <StatusChart data={thongKe?.projectsByStatus || {}} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top Lists */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Top Projects */}
+        <Card className="border-2 shadow-lg hover:shadow-xl transition-all bg-slate-800 border-slate-700">
+          <CardHeader className="bg-gradient-to-r from-green-800 to-emerald-900">
+            <CardTitle className="flex items-center gap-2 text-emerald-100">
+              <Award className="w-5 h-5" />
+              Top 5 Dự Án Được Quyên Góp Nhiều Nhất
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              {(thongKe?.topDuAnList || []).map((p: any, idx: number) => (
+                <div key={p.id} className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-slate-800 to-emerald-900 border-2 border-emerald-800 hover:border-emerald-600 transition-all">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-700 text-white font-bold shadow-lg">
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-semibold text-slate-100">{p.tieu_de}</div>
+                    <div className="text-sm text-slate-300 mt-1">{formatVND(p.so_tien)}</div>
+                  </div>
+                  <Zap className="w-5 h-5 text-emerald-300" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Top Donors */}
+        <Card className="border-2 shadow-lg hover:shadow-xl transition-all bg-slate-800 border-slate-700">
+          <CardHeader className="bg-gradient-to-r from-orange-800 to-red-900">
+            <CardTitle className="flex items-center gap-2 text-orange-100">
+              <Users className="w-5 h-5" />
+              Top 5 Nhà Hảo Tâm
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              {(thongKe?.topNguoiList || []).map((u: any, idx: number) => (
+                <div key={u.uid} className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-slate-800 to-orange-900 border-2 border-orange-800 hover:border-orange-600 transition-all">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-700 text-white font-bold shadow-lg">
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-semibold text-slate-100">{u.ten}</div>
+                    <div className="text-sm text-slate-300 mt-1">{formatVND(u.so_tien)}</div>
+                  </div>
+                  <Award className="w-5 h-5 text-orange-300" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Province Distribution */}
+      <Card className="border-2 shadow-lg hover:shadow-xl transition-all mb-8 bg-slate-800 border-slate-700">
+        <CardHeader className="bg-gradient-to-r from-indigo-800 to-blue-900">
+          <CardTitle className="flex items-center gap-2 text-indigo-100">
+            <MapPin className="w-5 h-5" />
+            Phân Bố Quyên Góp Theo Địa Phương
           </CardTitle>
         </CardHeader>
-
-        <CardContent className="flex flex-wrap gap-4 items-center">
-
-          {/* Bộ lọc ngày */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="secondary"
-                className="flex items-center gap-2 bg-card text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground">
-                <Filter /> Chọn ngày
-              </Button>
-            </PopoverTrigger>
-
-            <PopoverContent
-  side="bottom"
-  align="start"
-  className="p-0 bg-card border border-border shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
->
-  <div className="p-4 bg-background">
-    <div className="grid grid-cols-2 gap-4">
-      <div className="rounded-xl bg-card shadow-sm p-2">
-        <Calendar
-          mode="single"
-          selected={fromDate}
-          onSelect={setFromDate}
-          className="rounded-md"
-        />
-      </div>
-      <div className="rounded-xl bg-card shadow-sm p-2">
-        <Calendar
-          mode="single"
-          selected={toDate}
-          onSelect={setToDate}
-          className="rounded-md"
-        />
-      </div>
-    </div>
-
-    <div className="flex justify-between mt-4 gap-3">
-      <Button
-        variant="secondary"
-        className="px-4 py-2 bg-muted rounded-lg font-medium hover:bg-muted/70"
-        onClick={() => { setFromDate(undefined); setToDate(undefined); }}
-      >
-        Reset
-      </Button>
-
-      <Button
-        variant="default"
-        className="px-4 py-2 rounded-lg font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90"
-        onClick={() => computeStats(data.quyenGop, data.duAn, data.nguoiDung)}
-      >
-        Áp dụng
-      </Button>
-    </div>
-  </div>
-</PopoverContent>
-
-          </Popover>
-
-          {/* Filter dự án */}
-          <div className="flex items-center gap-2">
-            <div className="text-sm text-muted-foreground">Dự án</div>
-            <Select
-              onValueChange={(v) => setSelectedProjectId(v === "all" ? "all" : Number(v))}
-              value={String(selectedProjectId)}
-            >
-              <SelectTrigger className="w-64 bg-card shadow-sm">
-                <SelectValue placeholder="Tất cả dự án" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả dự án</SelectItem>
-                {data.duAn.map((d) => (
-                  <SelectItem key={d.id} value={String(d.id)}>{d.tieu_de}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Filter người */}
-          <div className="flex items-center gap-2">
-            <div className="text-sm text-muted-foreground">Người</div>
-            <Select
-              onValueChange={(v) => setSelectedUserId(v === "all" ? "all" : Number(v))}
-              value={String(selectedUserId)}
-            >
-              <SelectTrigger className="w-56 bg-card shadow-sm">
-                <SelectValue placeholder="Tất cả" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
-                {data.nguoiDung.map((u) => (
-                  <SelectItem key={u.id} value={String(u.id)}>
-                    {(u.ten || `${u.ho || ""} ${u.ten || ""}`).trim()}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
+        <CardContent className="pt-6">
+          <ProvinceChart data={thongKe?.provinceMap || {}} />
         </CardContent>
       </Card>
 
-
-      {/* KPI */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <KPICard title="Tổng quyên góp" value={animatedTotal} suffix="đ" isDark={isDark} />
-        <KPICard title="Tổng dự án" value={thongKe?.tongDuAn || 0} isDark={isDark} />
-        <KPICard title="Người dùng" value={thongKe?.tongNguoiDung || 0} isDark={isDark} />
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2 shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle>Quyên góp theo tháng</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Line data={lineData} options={{
-              plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
-              interaction: { mode: "index", intersect: false },
-              animation: { duration: 700, easing: "easeOutQuart" },
-              scales: { y: { ticks: { callback: (v) => formatVND(Number(v)) } } },
-              maintainAspectRatio: false,
-            }} height={220} />
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle>Phân loại dự án</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center justify-center">
-            <div style={{ width: 260, height: 220 }}>
-              <Pie data={doughnutData} options={{ plugins: { legend: { position: "bottom" } }, animation: { duration: 600 } }} />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Provinces + Top lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2 shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader><CardTitle>Quyên góp theo tỉnh/thành</CardTitle></CardHeader>
-          <CardContent>
-            <Bar data={provinceBarData} options={{
-              indexAxis: "y",
-              plugins: { legend: { display: false } },
-              animation: { duration: 700 },
-              scales: { x: { ticks: { callback: (v) => formatVND(Number(v)) } } },
-              maintainAspectRatio: false,
-            }} height={320} />
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader><CardTitle>Top dự án & người</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs text-muted-foreground mb-2">Top dự án</div>
-                <ol className="list-decimal pl-5 text-sm">
-                  {(thongKe?.topDuAnList || []).map((p: any) => (
-                    <li key={p.id} className="mb-2">
-                      <div className="font-medium">{p.tieu_de}</div>
-                      <div className="text-xs text-muted-foreground">{formatVND(p.so_tien)}</div>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-
-              <div>
-                <div className="text-xs text-muted-foreground mb-2">Top người</div>
-                <ol className="list-decimal pl-5 text-sm">
-                  {(thongKe?.topNguoiList || []).map((u: any) => (
-                    <li key={u.uid} className="mb-2">
-                      <div className="font-medium">{u.ten}</div>
-                      <div className="text-xs text-muted-foreground">{formatVND(u.so_tien)}</div>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Heatmap */}
-      <Card className="shadow-md hover:shadow-lg transition-shadow">
-        <CardHeader><CardTitle>Heatmap: Quyên góp theo ngày (trong tháng)</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 gap-2">
-            {Array.from({ length: 31 }).map((_, i) => {
-              const day = i + 1
-              const val = Number(thongKe?.heatmapCounts?.[day] || 0)
-              const intensity = Math.min(1, val / (heatmapMax || 1))
-              const bg = isDark ? `rgba(99,102,241,${0.08 + intensity * 0.9})` : `rgba(59,130,246,${0.08 + intensity * 0.9})`
-              return (
-                <div key={day} className="flex flex-col items-center">
-                  <div style={{ width: 40, height: 40, background: bg }} className="rounded-md flex items-center justify-center transition-all">
-                    <div className="text-sm font-medium">{day}</div>
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-1">{val ? formatVND(val) : "-"}</div>
-                </div>
-              )
-            })}
+      {/* Stats Summary */}
+      <Card className="border-2 shadow-lg hover:shadow-xl transition-all bg-slate-800 border-slate-700">
+        <CardHeader className="bg-gradient-to-r from-slate-800 to-blue-900">
+          <CardTitle className="flex items-center gap-2 text-slate-100">
+            <BarChart3 className="w-5 h-5" />
+            Tóm Tắt Thống Kê Chi Tiết
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <StatItem label="Giá trị trung bình mỗi giao dịch" value={formatVND(thongKe?.avgDonation || 0)} icon={<DollarSign className="w-5 h-5" />} />
+            <StatItem label="Tổng quyên góp tháng này" value={formatVND(thongKe?.currentMonthAmount || 0)} icon={<TrendingUp className="w-5 h-5" />} />
+            <StatItem label="Tổng quyên góp tháng trước" value={formatVND(thongKe?.lastMonthAmount || 0)} icon={<Clock className="w-5 h-5" />} />
           </div>
-          <div className="mt-3 text-xs text-muted-foreground">Intensity based on total donations that day (applies current filters).</div>
         </CardContent>
       </Card>
     </div>
   )
 }
 
-/* ---------- Small UI components used above (KPICard) ---------- */
-
-function KPICard({ title, value, suffix, isDark }: { title: string; value: number | string; suffix?: string; isDark?: boolean }) {
+// Component: KPI Card
+function KPICard({ title, value, icon, gradient, trend, subtitle }: any) {
   return (
-    <Card className="transform transition-transform hover:-translate-y-0.5">
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xs text-muted-foreground">{title}</div>
-            <div className="mt-2 text-2xl font-semibold">
-              {typeof value === "number" ? formatVND(value as number) : value} {suffix ? suffix : ""}
-            </div>
-          </div>
-          <div style={{
-            background: isDark ? "linear-gradient(135deg,#06b6d4,#7c3aed)" : "linear-gradient(135deg,#60a5fa,#34d399)",
-          }} className="h-12 w-12 rounded-full flex items-center justify-center shadow-sm">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-white"><circle cx="12" cy="12" r="8" /></svg>
+    <Card className="relative overflow-hidden border-2 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-slate-800 border-slate-700">
+      <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 opacity-10">
+        <div className={`w-full h-full rounded-full bg-gradient-to-br ${gradient}`} />
+      </div>
+      <CardContent className="p-6 relative text-slate-100">
+        <div className="flex items-start justify-between mb-4">
+          <div className="text-sm font-medium text-slate-300">{title}</div>
+          <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} text-white shadow-lg`}>
+            {icon}
           </div>
         </div>
+        <div className="text-3xl font-bold text-slate-100 mb-2">{value}</div>
+        {trend !== undefined && (
+          <div className="flex items-center gap-2 text-sm">
+            {trend >= 0 ? (
+              <>
+                <TrendingUp className="w-4 h-4 text-emerald-300" />
+                <span className="text-emerald-300 font-semibold">+{trend.toFixed(1)}%</span>
+              </>
+            ) : (
+              <>
+                <TrendingDown className="w-4 h-4 text-red-400" />
+                <span className="text-red-400 font-semibold">{trend.toFixed(1)}%</span>
+              </>
+            )}
+            <span className="text-slate-400">{subtitle}</span>
+          </div>
+        )}
+        {!trend && subtitle && (
+          <div className="text-sm text-slate-400">{subtitle}</div>
+        )}
       </CardContent>
     </Card>
   )
 }
 
-/* ---------- Helpers ---------- */
+// Component: Monthly Chart
+function MonthlyChart({ data }: { data: Record<string, number> }) {
+  const entries = Object.entries(data).sort()
+  const max = Math.max(...entries.map(([, v]) => v), 1)
+
+  if (entries.length === 0) {
+    return <div className="text-center text-slate-400 py-8">Chưa có dữ liệu</div>
+  }
+
+  return (
+    <div className="space-y-3">
+      {entries.map(([month, amount]) => (
+        <div key={month} className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-slate-200">{month}</span>
+            <span className="font-semibold text-indigo-300">{formatVND(amount)}</span>
+          </div>
+          <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-indigo-600 to-indigo-900 rounded-full transition-all duration-1000 ease-out"
+              style={{ width: `${(amount / max) * 100}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Component: Status Chart
+function StatusChart({ data }: { data: Record<string, number> }) {
+  const entries = Object.entries(data)
+  const total = entries.reduce((sum, [, v]) => sum + v, 0)
+  const colors = ['from-blue-600 to-blue-800', 'from-green-600 to-green-800', 'from-purple-600 to-purple-800', 'from-orange-600 to-orange-800']
+
+  if (entries.length === 0) {
+    return <div className="text-center text-slate-400 py-8">Chưa có dữ liệu</div>
+  }
+
+  return (
+    <div className="space-y-4">
+      {entries.map(([status, count], idx) => (
+        <div key={status} className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${colors[idx % colors.length]}`} />
+              <span className="font-medium text-slate-200 capitalize">{status.replace(/_/g, ' ')}</span>
+            </div>
+            <span className="font-semibold text-slate-100">{count}</span>
+          </div>
+          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full bg-gradient-to-r ${colors[idx % colors.length]} rounded-full transition-all duration-1000`}
+              style={{ width: `${(count / total) * 100}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Component: Province Chart
+function ProvinceChart({ data }: { data: Record<string, number> }) {
+  const entries = Object.entries(data).sort((a, b) => b[1] - a[1])
+  const max = Math.max(...entries.map(([, v]) => v), 1)
+
+  if (entries.length === 0) {
+    return <div className="text-center text-slate-400 py-8">Chưa có dữ liệu</div>
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {entries.map(([province, amount]) => (
+        <div key={province} className="p-4 rounded-xl bg-gradient-to-br from-slate-800 to-indigo-900 border-2 border-indigo-800 hover:border-indigo-600 transition-all hover:shadow-lg">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-blue-700 flex items-center justify-center shadow-lg">
+              <MapPin className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold text-slate-100">{province}</div>
+              <div className="text-xs text-slate-400">Địa phương</div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="text-lg font-bold text-indigo-300">{formatVND(amount)}</div>
+            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-indigo-600 to-blue-700 rounded-full transition-all duration-1000"
+                style={{ width: `${(amount / max) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Component: Stat Item
+function StatItem({ label, value, icon }: { label: string; value: string; icon: any }) {
+  return (
+    <div className="p-6 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-700 hover:border-indigo-600 transition-all hover:shadow-lg text-slate-100">
+      <div className="flex items-start gap-4">
+        <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 text-white shadow-lg">
+          {icon}
+        </div>
+        <div className="flex-1">
+          <div className="text-sm text-slate-300 mb-2">{label}</div>
+          <div className="text-2xl font-bold text-slate-100">{value}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Helper: Format VND
 function formatVND(amount: number) {
   if (typeof amount !== "number" || isNaN(amount)) return "₫0"
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(amount)
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0
+  }).format(amount)
 }
