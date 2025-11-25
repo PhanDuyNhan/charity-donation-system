@@ -1,254 +1,405 @@
-// app/payment/return/page.tsx
-'use client';
+"use client"
 
-import { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { CheckCircle, XCircle, Loader2, ArrowLeft } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { apiClient } from "@/lib/api-client"
+import { useAuthStore } from "@/lib/auth"
+import {
+  Heart,
+  Check,
+  X,
+  Home,
+  FileText,
+  Copy,
+  Facebook,
+  Twitter,
+  Linkedin,
+  Loader2,
+} from "lucide-react"
+import styles from "./page.module.css"
 
-interface VNPayParams {
-  vnp_Amount: string;
-  vnp_BankCode: string;
-  vnp_BankTranNo: string;
-  vnp_CardType: string;
-  vnp_OrderInfo: string;
-  vnp_PayDate: string;
-  vnp_ResponseCode: string;
-  vnp_TmnCode: string;
-  vnp_TransactionNo: string;
-  vnp_TransactionStatus: string;
-  vnp_TxnRef: string;
-  vnp_SecureHash: string;
-}
-
-interface PaymentData {
-  maNguoiDung: number;
-  maDuAn: number;
-  soTien: number;
-  phuongThucThanhToan: string;
-  trangThaiThanhToan: string;
-  maGiaoDich: string;
-  loiNhan: string;
-  phiGiaoDich: number;
-  soTienThuc: number;
-  donViTienTe: string;
-}
+/**
+ * Payment Return Page - 100% from HTML Template
+ * Handles VNPay callback and displays success/error
+ */
 
 export default function PaymentReturnPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [isProcessing, setIsProcessing] = useState(true);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [paymentInfo, setPaymentInfo] = useState<VNPayParams | null>(null);
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { user } = useAuthStore()
+
+  const [loading, setLoading] = useState(true)
+  const [success, setSuccess] = useState(false)
+  const [transactionData, setTransactionData] = useState<any>(null)
+  const [showConfetti, setShowConfetti] = useState(false)
 
   useEffect(() => {
     const processPayment = async () => {
       try {
-        // Lấy tất cả params từ URL
-        const params: VNPayParams = {
-          vnp_Amount: searchParams.get('vnp_Amount') || '',
-          vnp_BankCode: searchParams.get('vnp_BankCode') || '',
-          vnp_BankTranNo: searchParams.get('vnp_BankTranNo') || '',
-          vnp_CardType: searchParams.get('vnp_CardType') || '',
-          vnp_OrderInfo: searchParams.get('vnp_OrderInfo') || '',
-          vnp_PayDate: searchParams.get('vnp_PayDate') || '',
-          vnp_ResponseCode: searchParams.get('vnp_ResponseCode') || '',
-          vnp_TmnCode: searchParams.get('vnp_TmnCode') || '',
-          vnp_TransactionNo: searchParams.get('vnp_TransactionNo') || '',
-          vnp_TransactionStatus: searchParams.get('vnp_TransactionStatus') || '',
-          vnp_TxnRef: searchParams.get('vnp_TxnRef') || '',
-          vnp_SecureHash: searchParams.get('vnp_SecureHash') || '',
-        };
+        // Get all VNPay params
+        const vnpParams: Record<string, string> = {}
+        searchParams.forEach((value, key) => {
+          vnpParams[key] = value
+        })
 
-        setPaymentInfo(params);
+        // Check if payment successful
+        const responseCode = vnpParams.vnp_ResponseCode
+        const transactionStatus = vnpParams.vnp_TransactionStatus
 
-        // Kiểm tra mã phản hồi
-        // vnp_ResponseCode = '00' và vnp_TransactionStatus = '00' nghĩa là thành công
-        const isPaymentSuccess = params.vnp_ResponseCode === '00' && params.vnp_TransactionStatus === '00';
-        setIsSuccess(isPaymentSuccess);
+        const isSuccess =
+          responseCode === "00" && (!transactionStatus || transactionStatus === "00")
 
-        if (isPaymentSuccess) {
-          // Chuyển đổi số tiền (VNPay trả về số tiền * 100)
-          const amount = parseInt(params.vnp_Amount) / 100;
-          // const transactionFee = amount * 0.02; // 2% phí giao dịch
-          // const actualAmount = amount - transactionFee;
+        setSuccess(isSuccess)
 
-          // Chuẩn bị dữ liệu gửi lên API
-          // Lưu ý: Bạn cần lấy maNguoiDung và maDuAn từ session/context/localStorage
-          const paymentData: PaymentData = {
-            maNguoiDung: 1, // TODO: Lấy từ session/context
-            maDuAn: 1, // TODO: Lấy từ session/localStorage khi tạo thanh toán
-            soTien: amount,
-            phuongThucThanhToan: 'VNPAY',
-            trangThaiThanhToan: 'THANH_CONG',
-            maGiaoDich: params.vnp_TransactionNo,
-            loiNhan: decodeURIComponent(params.vnp_OrderInfo),
-            phiGiaoDich: 0,
-            soTienThuc: amount,
-            donViTienTe: 'VND',
-          };
+        if (isSuccess) {
+          // Show confetti
+          setShowConfetti(true)
 
-          // Gọi API để lưu thông tin thanh toán
-          const response = await apiClient.handlePayment(paymentData);
+          // Parse transaction data
+          const amount = parseInt(vnpParams.vnp_Amount || "0") / 100
+          const transactionNo = vnpParams.vnp_TransactionNo || "N/A"
+          const transactionDate = vnpParams.vnp_PayDate || ""
+          const bankCode = vnpParams.vnp_BankCode || "VNPAY"
+          const cardType = vnpParams.vnp_CardType || "ATM"
 
-          if (!response.ok) {
-            throw new Error('Không thể lưu thông tin thanh toán');
+          // Format date
+          let formattedDate = new Date().toLocaleString("vi-VN")
+          if (transactionDate && transactionDate.length === 14) {
+            // Format: YYYYMMDDHHmmss
+            const year = transactionDate.substring(0, 4)
+            const month = transactionDate.substring(4, 6)
+            const day = transactionDate.substring(6, 8)
+            const hour = transactionDate.substring(8, 10)
+            const minute = transactionDate.substring(10, 12)
+            const second = transactionDate.substring(12, 14)
+            formattedDate = `${day}/${month}/${year} - ${hour}:${minute}:${second}`
           }
 
-          const result = await response.json();
-          console.log('Payment saved:', result);
+          setTransactionData({
+            amount,
+            transactionNo,
+            transactionDate: formattedDate,
+            bankCode,
+            cardType,
+            projectId: vnpParams.vnp_OrderInfo || "N/A",
+            donorName: user?.ho && user?.ten ? `${user.ho} ${user.ten}` : "Ẩn danh",
+            paymentMethod: `${bankCode} (${cardType})`,
+          })
+
+          // Save to database
+          try {
+            const paymentData = {
+              maNguoiDung: user?.id || 1,
+              maDuAn: parseInt(vnpParams.vnp_OrderInfo || "1"),
+              soTien: amount,
+              phuongThucThanhToan: "VNPAY",
+              trangThaiThanhToan: "THANH_CONG",
+              maGiaoDich: transactionNo,
+              loiNhan: "Quyên góp thành công qua VNPay",
+              laQuyenGopAnDanh: !user,
+            }
+
+            await apiClient.handlePayment(paymentData)
+          } catch (err) {
+            console.error("Error saving payment:", err)
+          }
+        } else {
+          setTransactionData({
+            error: "Thanh toán không thành công",
+            errorCode: responseCode,
+            errorMessage: getErrorMessage(responseCode),
+          })
         }
-      } catch (err) {
-        console.error('Error processing payment:', err);
-        setError(err instanceof Error ? err.message : 'Có lỗi xảy ra khi xử lý thanh toán');
+      } catch (error) {
+        console.error("Error processing payment:", error)
+        setSuccess(false)
+        setTransactionData({
+          error: "Có lỗi xảy ra khi xử lý thanh toán",
+        })
       } finally {
-        setIsProcessing(false);
+        setLoading(false)
       }
-    };
+    }
 
-    processPayment();
-  }, [searchParams]);
+    processPayment()
+  }, [searchParams, user])
 
-  // Format số tiền
-  const formatAmount = (amount: string) => {
-    const num = parseInt(amount) / 100;
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(num);
-  };
+  const getErrorMessage = (code: string) => {
+    const errorMessages: Record<string, string> = {
+      "07": "Giao dịch bị nghi ngờ gian lận",
+      "09": "Thẻ/Tài khoản chưa đăng ký dịch vụ",
+      "10": "Thẻ/Tài khoản không đủ số dư",
+      "11": "Giao dịch hết hạn thanh toán",
+      "12": "Thẻ/Tài khoản bị khóa",
+      "13": "Sai mật khẩu xác thực",
+      "24": "Giao dịch bị hủy",
+      "51": "Tài khoản không đủ số dư",
+      "65": "Tài khoản vượt quá giới hạn giao dịch",
+      "75": "Ngân hàng đang bảo trì",
+      "79": "Giao dịch vượt quá số lần nhập sai mật khẩu",
+      "99": "Lỗi không xác định",
+    }
+    return errorMessages[code] || "Giao dịch không thành công"
+  }
 
-  // Format ngày giờ
-  const formatDate = (dateStr: string) => {
-    if (!dateStr || dateStr.length !== 14) return dateStr;
-    const year = dateStr.substring(0, 4);
-    const month = dateStr.substring(4, 6);
-    const day = dateStr.substring(6, 8);
-    const hour = dateStr.substring(8, 10);
-    const minute = dateStr.substring(10, 12);
-    const second = dateStr.substring(12, 14);
-    return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
-  };
+  const handleCopy = () => {
+    if (transactionData?.transactionNo) {
+      navigator.clipboard.writeText(transactionData.transactionNo)
+      alert("Đã sao chép mã giao dịch!")
+    }
+  }
 
-  if (isProcessing) {
+  const handleShare = (platform: string) => {
+    const url = window.location.origin
+    const text = `Tôi vừa quyên góp ${
+      transactionData?.amount || 0
+    } đ cho chiến dịch từ thiện!`
+
+    switch (platform) {
+      case "facebook":
+        window.open(
+          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+          "_blank"
+        )
+        break
+      case "twitter":
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+          "_blank"
+        )
+        break
+      case "linkedin":
+        window.open(
+          `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+          "_blank"
+        )
+        break
+      case "copy":
+        navigator.clipboard.writeText(url)
+        alert("Đã copy link!")
+        break
+    }
+  }
+
+  const formatMoney = (amount: number) => {
+    return new Intl.NumberFormat("vi-VN").format(amount)
+  }
+
+  // Confetti pieces
+  const confettiColors = [
+    "#2E7D32",
+    "#FF9800",
+    "#8BC34A",
+    "#2196F3",
+    "#E91E63",
+    "#9C27B0",
+    "#FF5722",
+    "#4CAF50",
+    "#FFC107",
+  ]
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Đang xử lý thanh toán</h2>
-          <p className="text-gray-600">Vui lòng đợi trong giây lát...</p>
+      <div className={styles.body}>
+        <div className={styles.loading}>
+          <Loader2 style={{ width: 48, height: 48 }} />
+          <p>Đang xử lý giao dịch...</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 max-w-2xl w-full">
-        {/* Header */}
-        <div className="text-center mb-8">
-          {isSuccess ? (
-            <>
-              <div className="mb-4 flex justify-center">
-                <div className="bg-green-100 rounded-full p-4">
-                  <CheckCircle className="w-16 h-16 text-green-600" />
-                </div>
-              </div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">Thanh toán thành công!</h1>
-              <p className="text-gray-600">Giao dịch của bạn đã được xử lý thành công</p>
-            </>
-          ) : (
-            <>
-              <div className="mb-4 flex justify-center">
-                <div className="bg-red-100 rounded-full p-4">
-                  <XCircle className="w-16 h-16 text-red-600" />
-                </div>
-              </div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">Thanh toán thất bại!</h1>
-              <p className="text-gray-600">Giao dịch không thành công. Vui lòng thử lại</p>
-            </>
-          )}
+    <div className={styles.body}>
+      {/* Confetti */}
+      {showConfetti && success && (
+        <div className={styles.confetti}>
+          {confettiColors.map((color, i) => (
+            <div
+              key={i}
+              className={styles.confettiPiece}
+              style={{
+                left: `${(i + 1) * 10}%`,
+                animationDelay: `${i * 0.1}s`,
+                background: color,
+              }}
+            />
+          ))}
         </div>
+      )}
 
-        {/* Thông tin giao dịch */}
-        {paymentInfo && (
-          <div className="border-t border-b border-gray-200 py-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Thông tin giao dịch</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Số tiền:</span>
-                <span className="font-semibold text-gray-800">{formatAmount(paymentInfo.vnp_Amount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Mã giao dịch:</span>
-                <span className="font-semibold text-gray-800">{paymentInfo.vnp_TransactionNo}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Mã đơn hàng:</span>
-                <span className="font-semibold text-gray-800">{paymentInfo.vnp_TxnRef}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Ngân hàng:</span>
-                <span className="font-semibold text-gray-800">{paymentInfo.vnp_BankCode}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Loại thẻ:</span>
-                <span className="font-semibold text-gray-800">{paymentInfo.vnp_CardType}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Thời gian:</span>
-                <span className="font-semibold text-gray-800">{formatDate(paymentInfo.vnp_PayDate)}</span>
-              </div>
-              {paymentInfo.vnp_OrderInfo && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Nội dung:</span>
-                  <span className="font-semibold text-gray-800">{decodeURIComponent(paymentInfo.vnp_OrderInfo)}</span>
+      {/* Header */}
+      <header className={styles.header}>
+        <nav className={styles.nav}>
+          <div className={styles.logo}>
+            <Heart style={{ width: 28, height: 28 }} />
+            <span>TỪ THIỆN XANH</span>
+          </div>
+        </nav>
+      </header>
+
+      {/* Main Content */}
+      <main className={styles.mainContent}>
+        <div className={styles.successContainer}>
+          <div className={`${styles.successCard} ${!success ? styles.errorCard : ""}`}>
+            {success ? (
+              <>
+                <div className={styles.successIcon}>
+                  <Check style={{ width: 60, height: 60 }} />
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-gray-600">Trạng thái:</span>
-                <span className={`font-semibold ${isSuccess ? 'text-green-600' : 'text-red-600'}`}>
-                  {isSuccess ? 'Thành công' : 'Thất bại'}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Thông báo lỗi */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-800 text-sm">{error}</p>
-          </div>
-        )}
+                <h1>Quyên góp thành công!</h1>
+                <p>Cảm ơn bạn đã đồng hành cùng Từ Thiện Xanh</p>
 
-        {/* Nút hành động */}
-        <div className="flex gap-4">
-          <button
-            onClick={() => router.push('/')}
-            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Về trang chủ
-          </button>
-          {isSuccess ? (
-            <button
-              onClick={() => router.push('/my-contributions')}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200"
-            >
-              Xem đóng góp
-            </button>
-          ) : (
-            <button
-              onClick={() => router.back()}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200"
-            >
-              Thử lại
-            </button>
-          )}
+                {transactionData && (
+                  <>
+                    <div className={styles.transactionDetails}>
+                      <div className={styles.detailRow}>
+                        <span className={styles.label}>Dự án</span>
+                        <span className={styles.value}>
+                          Mã dự án #{transactionData.projectId}
+                        </span>
+                      </div>
+                      <div className={styles.detailRow}>
+                        <span className={styles.label}>Phương thức</span>
+                        <span className={styles.value}>{transactionData.paymentMethod}</span>
+                      </div>
+                      <div className={styles.detailRow}>
+                        <span className={styles.label}>Thời gian</span>
+                        <span className={styles.value}>{transactionData.transactionDate}</span>
+                      </div>
+                      <div className={styles.detailRow}>
+                        <span className={styles.label}>Người quyên góp</span>
+                        <span className={styles.value}>{transactionData.donorName}</span>
+                      </div>
+                      <div className={`${styles.detailRow} ${styles.total}`}>
+                        <span className={styles.label}>Số tiền quyên góp</span>
+                        <span className={styles.value}>
+                          {formatMoney(transactionData.amount)}đ
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={styles.transactionId}>
+                      <div className={styles.idGroup}>
+                        <div className={styles.idLabel}>Mã giao dịch</div>
+                        <div className={styles.id}>{transactionData.transactionNo}</div>
+                      </div>
+                      <button className={styles.copyBtn} onClick={handleCopy}>
+                        <Copy style={{ width: 14, height: 14 }} />
+                        Sao chép
+                      </button>
+                    </div>
+
+                    <div className={styles.thankMessage}>
+                      <p>
+                        <Heart style={{ width: 18, height: 18 }} />
+                        Mỗi đóng góp của bạn đều mang lại niềm vui và hy vọng cho những
+                        người khó khăn. 100% số tiền sẽ được chuyển đến dự án. Chúng tôi sẽ
+                        cập nhật tiến độ qua email cho bạn.
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                <div className={styles.actionButtons}>
+                  <button
+                    className={`${styles.btn} ${styles.btnPrimary}`}
+                    onClick={() => router.push("/")}
+                  >
+                    <Home style={{ width: 20, height: 20 }} />
+                    Về trang chủ
+                  </button>
+                  <button
+                    className={`${styles.btn} ${styles.btnOutline}`}
+                    onClick={() => router.push("/ho-so")}
+                  >
+                    <FileText style={{ width: 20, height: 20 }} />
+                    Xem lịch sử
+                  </button>
+                </div>
+
+                <div className={styles.shareSection}>
+                  <p>Chia sẻ để lan tỏa yêu thương</p>
+                  <div className={styles.socialShare}>
+                    <button
+                      className={`${styles.shareBtn} ${styles.facebook}`}
+                      onClick={() => handleShare("facebook")}
+                    >
+                      <Facebook style={{ width: 20, height: 20 }} />
+                    </button>
+                    <button
+                      className={`${styles.shareBtn} ${styles.twitter}`}
+                      onClick={() => handleShare("twitter")}
+                    >
+                      <Twitter style={{ width: 20, height: 20 }} />
+                    </button>
+                    <button
+                      className={`${styles.shareBtn} ${styles.linkedin}`}
+                      onClick={() => handleShare("linkedin")}
+                    >
+                      <Linkedin style={{ width: 20, height: 20 }} />
+                    </button>
+                    <button
+                      className={`${styles.shareBtn} ${styles.copy}`}
+                      onClick={() => handleShare("copy")}
+                    >
+                      <Copy style={{ width: 20, height: 20 }} />
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.errorIcon}>
+                  <X style={{ width: 60, height: 60 }} />
+                </div>
+
+                <h1>Thanh toán không thành công</h1>
+                <p>{transactionData?.errorMessage || "Đã có lỗi xảy ra"}</p>
+
+                {transactionData && (
+                  <div className={styles.transactionDetails}>
+                    <div className={styles.detailRow}>
+                      <span className={styles.label}>Mã lỗi</span>
+                      <span className={styles.value}>{transactionData.errorCode}</span>
+                    </div>
+                    <div className={styles.detailRow}>
+                      <span className={styles.label}>Thời gian</span>
+                      <span className={styles.value}>
+                        {new Date().toLocaleString("vi-VN")}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className={styles.thankMessage}>
+                  <p>
+                    Giao dịch của bạn không thành công. Vui lòng thử lại hoặc liên hệ với
+                    chúng tôi nếu bạn cần hỗ trợ.
+                  </p>
+                </div>
+
+                <div className={styles.actionButtons}>
+                  <button
+                    className={`${styles.btn} ${styles.btnPrimary}`}
+                    onClick={() => router.back()}
+                  >
+                    Thử lại
+                  </button>
+                  <button
+                    className={`${styles.btn} ${styles.btnOutline}`}
+                    onClick={() => router.push("/")}
+                  >
+                    <Home style={{ width: 20, height: 20 }} />
+                    Về trang chủ
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      </main>
     </div>
-  );
+  )
 }
