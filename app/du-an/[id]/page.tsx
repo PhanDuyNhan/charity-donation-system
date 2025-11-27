@@ -18,8 +18,18 @@ import {
   Copy,
   CheckCircle,
   HandHeart,
+  Link as LinkIcon,
+  Loader2,
+  ShieldCheck,
 } from "lucide-react"
 import styles from "./page.module.css"
+import {
+  getProjectDonationsFromBlockchain,
+  type FormattedBlockchainDonation,
+  BLOCKCHAIN_CONFIG,
+  getEtherscanAddressLink,
+  shortenAddress,
+} from "@/lib/blockchain"
 
 /**
  * Trang chi tiết dự án - 100% theo HTML template
@@ -34,7 +44,12 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [topDonors, setTopDonors] = useState<any[]>([])
-  const [activeTab, setActiveTab] = useState<"intro" | "updates" | "donors" | "comments">("intro")
+  const [activeTab, setActiveTab] = useState<"intro" | "updates" | "donors" | "blockchain" | "comments">("intro")
+
+  // Blockchain state
+  const [blockchainDonations, setBlockchainDonations] = useState<FormattedBlockchainDonation[]>([])
+  const [blockchainLoading, setBlockchainLoading] = useState(false)
+  const [blockchainError, setBlockchainError] = useState<string | null>(null)
 
   // Gallery state
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -57,9 +72,9 @@ export default function ProjectDetailPage() {
         try {
           const qg = await apiClient.getQuyenGop({
             ma_du_an: `eq.${duAn.id}`,
+            trang_thai_: `eq.thanh_cong`,
             select: "*,nguoi_dung(*)",
-            order: "so_tien.desc",
-            limit: 50,
+            order: "so_tien_thuc.desc",
           })
           setTopDonors(qg || [])
         } catch (err) {
@@ -72,6 +87,27 @@ export default function ProjectDetailPage() {
 
     loadData()
   }, [id])
+
+  // Load blockchain data when switching to blockchain tab
+  useEffect(() => {
+    if (activeTab === "blockchain" && project && blockchainDonations.length === 0 && !blockchainLoading) {
+      const loadBlockchainData = async () => {
+        setBlockchainLoading(true)
+        setBlockchainError(null)
+        try {
+          const donations = await getProjectDonationsFromBlockchain(project.id)
+          console.log("🚀 ~ loadBlockchainData ~ donations:", donations)
+          setBlockchainDonations(donations)
+        } catch (err) {
+          console.error("❌ Lỗi khi tải dữ liệu blockchain:", err)
+          setBlockchainError("Không thể tải dữ liệu từ blockchain")
+        } finally {
+          setBlockchainLoading(false)
+        }
+      }
+      loadBlockchainData()
+    }
+  }, [activeTab, project, blockchainDonations.length, blockchainLoading])
 
   if (loading)
     return (
@@ -121,9 +157,12 @@ export default function ProjectDetailPage() {
 
   const currentImage = thuVienAnh[currentImageIndex]
 
+  // Tính tổng số tiền đã quyên góp từ danh sách quyên góp (chỉ tính giao dịch thành công)
+  const totalDonated = topDonors.reduce((sum, d) => sum + (d.so_tien_thuc || 0), 0)
+
   const progress =
     project.so_tien_muc_tieu > 0
-      ? (project.so_tien_hien_tai / project.so_tien_muc_tieu) * 100
+      ? (totalDonated / project.so_tien_muc_tieu) * 100
       : 0
 
   const daysRemaining = Math.ceil(
@@ -133,6 +172,19 @@ export default function ProjectDetailPage() {
   const formatMoney = (amount: number) => {
     return new Intl.NumberFormat("vi-VN").format(amount)
   }
+
+  // Format ngày theo dd/mm/yyyy
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return dateStr
+    const day = date.getDate().toString().padStart(2, '0')
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const year = date.getFullYear()
+    return `${day}/${month}/${year}`
+  }
+
+  // Kiểm tra dự án đã kết thúc chưa
+  const isExpired = daysRemaining < 0
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % thuVienAnh.length)
@@ -265,17 +317,23 @@ export default function ProjectDetailPage() {
               >
                 Giới thiệu
               </button>
-              <button
+              {/* <button
                 className={`${styles.tab} ${activeTab === "updates" ? styles.active : ""}`}
                 onClick={() => setActiveTab("updates")}
               >
                 Cập nhật (0)
-              </button>
+              </button> */}
               <button
                 className={`${styles.tab} ${activeTab === "donors" ? styles.active : ""}`}
                 onClick={() => setActiveTab("donors")}
               >
                 Nhà hảo tâm ({topDonors.length})
+              </button>
+              <button
+                className={`${styles.tab} ${activeTab === "blockchain" ? styles.active : ""}`}
+                onClick={() => setActiveTab("blockchain")}
+              >
+                Blockchain ({blockchainDonations.length})
               </button>
               <button
                 className={`${styles.tab} ${activeTab === "comments" ? styles.active : ""}`}
@@ -349,7 +407,149 @@ export default function ProjectDetailPage() {
                             <p>{new Date(d.ngay_tao).toLocaleString("vi-VN")}</p>
                             {d.loi_nhan && <p className={styles.donorMessage}>"{d.loi_nhan}"</p>}
                           </div>
-                          <div className={styles.donorAmount}>{formatMoney(d.so_tien)} đ</div>
+                          <div className={styles.donorAmount}>{formatMoney(d.so_tien_thuc)} đ</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "blockchain" && (
+                <div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '16px',
+                    padding: '12px',
+                    background: '#f0fdf4',
+                    borderRadius: '8px',
+                    border: '1px solid #bbf7d0'
+                  }}>
+                    <ShieldCheck style={{ width: 20, height: 20, color: '#16a34a' }} />
+                    <div>
+                      <p style={{ fontWeight: 600, color: '#166534', margin: 0 }}>Dữ liệu minh bạch từ Blockchain</p>
+                      <p style={{ fontSize: '12px', color: '#15803d', margin: '4px 0 0 0' }}>
+                        Mạng: {BLOCKCHAIN_CONFIG.NETWORK_NAME.toUpperCase()} |
+                        Contract: <a
+                          href={getEtherscanAddressLink(BLOCKCHAIN_CONFIG.CONTRACT_ADDRESS)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#2563eb', textDecoration: 'underline' }}
+                        >
+                          {shortenAddress(BLOCKCHAIN_CONFIG.CONTRACT_ADDRESS)}
+                        </a>
+                      </p>
+                    </div>
+                  </div>
+
+                  {blockchainLoading ? (
+                    <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                      <Loader2 style={{ width: 32, height: 32, color: '#2563eb', animation: 'spin 1s linear infinite' }} />
+                      <p style={{ color: '#757575', marginTop: '12px' }}>Đang tải dữ liệu từ blockchain...</p>
+                    </div>
+                  ) : blockchainError ? (
+                    <div style={{
+                      textAlign: 'center',
+                      padding: '40px 0',
+                      background: '#fef2f2',
+                      borderRadius: '8px',
+                      color: '#dc2626'
+                    }}>
+                      <p>{blockchainError}</p>
+                      <button
+                        onClick={() => {
+                          setBlockchainDonations([])
+                          setBlockchainError(null)
+                        }}
+                        style={{
+                          marginTop: '12px',
+                          padding: '8px 16px',
+                          background: '#dc2626',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Thử lại
+                      </button>
+                    </div>
+                  ) : blockchainDonations.length === 0 ? (
+                    <p style={{ textAlign: 'center', padding: '40px 0', color: '#757575' }}>
+                      Chưa có giao dịch nào được ghi trên blockchain.
+                    </p>
+                  ) : (
+                    <div>
+                      <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                        <LinkIcon style={{ width: 20, height: 20, color: '#2563eb' }} />
+                        Danh sách giao dịch trên Blockchain ({blockchainDonations.length})
+                      </h3>
+                      {blockchainDonations.map((d) => (
+                        <div
+                          key={d.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '16px',
+                            borderBottom: '1px solid #e5e7eb',
+                          }}
+                        >
+                          <div style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontWeight: 600,
+                            fontSize: '14px'
+                          }}>
+                            #{d.id}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <a
+                                href={getEtherscanAddressLink(d.donor)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontWeight: 600,
+                                  color: '#2563eb',
+                                  textDecoration: 'none',
+                                  fontFamily: 'monospace'
+                                }}
+                              >
+                                {d.donorShort}
+                              </a>
+                              <span style={{
+                                fontSize: '11px',
+                                background: '#dbeafe',
+                                color: '#1d4ed8',
+                                padding: '2px 6px',
+                                borderRadius: '4px'
+                              }}>
+                                {d.paymentMethod}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '13px', color: '#757575', margin: '4px 0' }}>
+                              {d.timestampFormatted}
+                            </p>
+                            <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>
+                              Mã GD: {d.transactionCode}
+                            </p>
+                          </div>
+                          <div style={{
+                            fontWeight: 700,
+                            color: '#16a34a',
+                            fontSize: '16px'
+                          }}>
+                            {formatMoney(d.amount)} {d.currency}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -398,7 +598,7 @@ export default function ProjectDetailPage() {
                       phút trước
                     </p>
                   </div>
-                  <div className={styles.donorAmount}>{formatMoney(d.so_tien)} đ</div>
+                  <div className={styles.donorAmount}>{formatMoney(d.so_tien_thuc)} đ</div>
                 </div>
               ))}
             </div>
@@ -410,7 +610,7 @@ export default function ProjectDetailPage() {
           {/* Donation Box */}
           <div className={styles.donationBox}>
             <div className={styles.progressSection}>
-              <div className={styles.amountRaised}>{formatMoney(project.so_tien_hien_tai)} đ</div>
+              <div className={styles.amountRaised}>{formatMoney(totalDonated)} đ</div>
               <div className={styles.amountTarget}>
                 đã quyên góp / mục tiêu {formatMoney(project.so_tien_muc_tieu)} đ
               </div>
@@ -422,8 +622,15 @@ export default function ProjectDetailPage() {
                   Đạt <strong>{Math.round(progress)}%</strong>
                 </span>
                 <span>
-                  Còn <strong>{daysRemaining} ngày</strong>
+                  {isExpired ? (
+                    <strong style={{ color: '#ef4444' }}>Đã kết thúc</strong>
+                  ) : (
+                    <>Còn <strong>{daysRemaining} ngày</strong></>
+                  )}
                 </span>
+              </div>
+              <div style={{ fontSize: '13px', color: '#757575', marginTop: '8px', textAlign: 'center' }}>
+                {formatDate(project.ngay_bat_dau)} - {formatDate(project.ngay_ket_thuc)}
               </div>
             </div>
 
@@ -433,7 +640,9 @@ export default function ProjectDetailPage() {
                 <p>Lượt ủng hộ</p>
               </div>
               <div className={styles.statItem}>
-                <h4>{daysRemaining}</h4>
+                <h4 style={isExpired ? { color: '#ef4444' } : undefined}>
+                  {isExpired ? 0 : daysRemaining}
+                </h4>
                 <p>Ngày còn lại</p>
               </div>
               <div className={styles.statItem}>
@@ -442,38 +651,54 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
-            <div className={styles.amountOptions}>
-              {amountOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  className={`${styles.amountBtn} ${selectedAmount === opt.value ? styles.active : ""}`}
-                  onClick={() => {
-                    setSelectedAmount(opt.value)
-                    setCustomAmount("")
-                  }}
-                >
-                  {opt.label}
+            {isExpired ? (
+              <div style={{
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '8px',
+                padding: '16px',
+                textAlign: 'center',
+                color: '#dc2626'
+              }}>
+                <p style={{ fontWeight: 600, marginBottom: '4px' }}>Chiến dịch đã kết thúc</p>
+                <p style={{ fontSize: '14px', color: '#757575' }}>Cảm ơn bạn đã quan tâm đến dự án này</p>
+              </div>
+            ) : (
+              <>
+                <div className={styles.amountOptions}>
+                  {amountOptions.map((opt) => (
+                    <button
+                      key={opt.value}
+                      className={`${styles.amountBtn} ${selectedAmount === opt.value ? styles.active : ""}`}
+                      onClick={() => {
+                        setSelectedAmount(opt.value)
+                        setCustomAmount("")
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className={styles.customAmount}>
+                  <input
+                    type="text"
+                    placeholder="Nhập số tiền khác"
+                    value={customAmount}
+                    onChange={(e) => {
+                      setCustomAmount(e.target.value)
+                      setSelectedAmount("")
+                    }}
+                  />
+                  <span>VNĐ</span>
+                </div>
+
+                <button className={styles.btnDonate} onClick={handleDonateClick}>
+                  <HandHeart style={{ width: 24, height: 24 }} />
+                  Quyên góp ngay
                 </button>
-              ))}
-            </div>
-
-            <div className={styles.customAmount}>
-              <input
-                type="text"
-                placeholder="Nhập số tiền khác"
-                value={customAmount}
-                onChange={(e) => {
-                  setCustomAmount(e.target.value)
-                  setSelectedAmount("")
-                }}
-              />
-              <span>VNĐ</span>
-            </div>
-
-            <button className={styles.btnDonate} onClick={handleDonateClick}>
-              <HandHeart style={{ width: 24, height: 24 }} />
-              Quyên góp ngay
-            </button>
+              </>
+            )}
 
             <div className={styles.shareSection}>
               <p>Chia sẻ chiến dịch này</p>
