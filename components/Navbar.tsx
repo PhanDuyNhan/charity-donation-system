@@ -49,7 +49,20 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           {isAuthenticated && user ? (
             <>
-              <span className="text-sm text-gray-700">Xin chào, {user.ten}</span>
+              <Link href="/ho-so" className="flex items-center gap-3 hover:opacity-80">
+  <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200">
+    {user.anh_dai_dien ? (
+      <img src={user.anh_dai_dien} className="w-full h-full object-cover" />
+    ) : (
+      <div className="w-full h-full flex items-center justify-center font-semibold">
+        {user.ten.charAt(0).toUpperCase()}
+      </div>
+    )}
+  </div>
+  <span className="text-sm">{user.ten}</span>
+</Link>
+
+
               <Button variant="ghost" size="sm" onClick={handleLogout}>
                 Đăng Xuất
               </Button>
@@ -57,9 +70,7 @@ export default function Navbar() {
           ) : (
             <>
               <Link href="/dang-nhap">
-                <Button variant="ghost" size="sm">
-                  Đăng Nhập
-                </Button>
+                <Button variant="ghost" size="sm">Đăng Nhập</Button>
               </Link>
               <Link href="/dang-ky">
                 <Button size="sm" className="bg-(--color-primary) hover:bg-(--color-primary-hover)">
@@ -69,6 +80,7 @@ export default function Navbar() {
             </>
           )}
         </div>
+
       </div>
     </header>
   )

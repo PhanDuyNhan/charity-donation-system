@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -9,7 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { apiClient } from "@/lib/api-client"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
@@ -17,12 +14,11 @@ import Link from "next/link"
 export default function ThemTinTucMoiPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+
   const [formData, setFormData] = useState({
     tieu_de: "",
     noi_dung: "",
-    tom_tat: "",
-    trang_thai: "nhap",
-    hinh_anh: "",
+    anh_dai_dien: "",
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,18 +26,18 @@ export default function ThemTinTucMoiPage() {
     setLoading(true)
 
     try {
-      const data = {
+      const payload = {
         ...formData,
-        luot_xem: 0,
+        ma_tac_gia: 1, // TODO: có thể lấy từ auth nếu muốn
         ngay_tao: new Date().toISOString(),
       }
 
-      await apiClient.post("tin_tuc", data)
-      alert("Thêm tin tức mới thành công!")
+      await apiClient.createTinTuc(payload)
+      alert("Thêm tin tức thành công!")
       router.push("/admin/tin-tuc")
     } catch (error) {
       console.error("Lỗi khi thêm tin tức:", error)
-      alert("Không thể thêm tin tức. Vui lòng thử lại.")
+      alert("Không thể thêm tin tức!")
     } finally {
       setLoading(false)
     }
@@ -55,9 +51,10 @@ export default function ThemTinTucMoiPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
+
         <div>
-          <h1 className="text-3xl font-bold">Thêm tin tức mới</h1>
-          <p className="text-muted-foreground mt-1">Tạo bài viết tin tức mới</p>
+          <h1 className="text-3xl font-bold">Thêm Tin tức</h1>
+          <p className="text-muted-foreground">Tạo tin tức mới</p>
         </div>
       </div>
 
@@ -66,13 +63,11 @@ export default function ThemTinTucMoiPage() {
           <CardHeader>
             <CardTitle>Thông tin tin tức</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+
+          <CardContent className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="tieu_de">
-                Tiêu đề <span className="text-destructive">*</span>
-              </Label>
+              <Label>Tiêu đề *</Label>
               <Input
-                id="tieu_de"
                 required
                 value={formData.tieu_de}
                 onChange={(e) => setFormData({ ...formData, tieu_de: e.target.value })}
@@ -81,71 +76,33 @@ export default function ThemTinTucMoiPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="tom_tat">
-                Tóm tắt <span className="text-destructive">*</span>
-              </Label>
+              <Label>Nội dung *</Label>
               <Textarea
-                id="tom_tat"
                 required
-                value={formData.tom_tat}
-                onChange={(e) => setFormData({ ...formData, tom_tat: e.target.value })}
-                placeholder="Tóm tắt ngắn gọn nội dung bài viết"
-                rows={3}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="noi_dung">
-                Nội dung <span className="text-destructive">*</span>
-              </Label>
-              <Textarea
-                id="noi_dung"
-                required
+                rows={8}
                 value={formData.noi_dung}
                 onChange={(e) => setFormData({ ...formData, noi_dung: e.target.value })}
-                placeholder="Nội dung chi tiết bài viết"
-                rows={10}
+                placeholder="Nhập nội dung chi tiết bài viết"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="hinh_anh">URL hình ảnh</Label>
+              <Label>Ảnh đại diện (URL)</Label>
               <Input
-                id="hinh_anh"
                 type="url"
-                value={formData.hinh_anh}
-                onChange={(e) => setFormData({ ...formData, hinh_anh: e.target.value })}
+                value={formData.anh_dai_dien}
+                onChange={(e) => setFormData({ ...formData, anh_dai_dien: e.target.value })}
                 placeholder="https://example.com/image.jpg"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="trang_thai">
-                Trạng thái <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={formData.trang_thai}
-                onValueChange={(value) => setFormData({ ...formData, trang_thai: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nhap">Nháp</SelectItem>
-                  <SelectItem value="cho_duyet">Chờ duyệt</SelectItem>
-                  <SelectItem value="da_xuat_ban">Đã xuất bản</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex gap-4 pt-4">
+            <div className="flex gap-4 pt-3">
               <Button type="submit" disabled={loading}>
                 {loading ? "Đang lưu..." : "Tạo tin tức"}
               </Button>
+
               <Link href="/admin/tin-tuc">
-                <Button type="button" variant="outline">
-                  Hủy
-                </Button>
+                <Button variant="outline">Hủy</Button>
               </Link>
             </div>
           </CardContent>
