@@ -4,42 +4,75 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Heart, ArrowRight, HandHeart, Target, Shield } from "lucide-react"
+import { Heart, ArrowRight, HandHeart, Target, Shield, MapPin, Clock } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { apiClient } from "@/lib/api-client"
 import ChatbotWidget from "@/components/ui/chatbox"
-import { DuAn } from "@/lib/types"
+import { DuAn, DanhMucDuAn } from "@/lib/types"
+
+// Map lưu tổng tiền quyên góp theo mã dự án
+type ProjectDonationMap = Record<number, number>;
+
 export default function HomePage() {
   const [page, setPage] = useState(1)
   const [projects, setProjects] = useState<DuAn[]>([])
+  const [categories, setCategories] = useState<DanhMucDuAn[]>([])
+  const [projectDonations, setProjectDonations] = useState<ProjectDonationMap>({})
   const [isLoading, setIsLoading] = useState(false);
   const [totalProjects, setTotalProjects] = useState(0);
   const pageSize = 3;
 
   useEffect(() => {
     let mounted = true;
-    async function fetchProjects() {
-      // Đảm bảo các state sau được khai báo: page, pageSize, setProjects, setTotalProjects, setIsLoading
+    async function fetchData() {
       setIsLoading(true);
 
       try {
+        // Lấy danh mục
+        const categoriesRes = await apiClient.getDanhMucDuAn();
+        if (mounted && Array.isArray(categoriesRes)) {
+          setCategories(categoriesRes);
+        }
+
         // Tính toán offset (vị trí bắt đầu)
         const offset = (page - 1) * pageSize;
 
         const res = await apiClient.getDuAn({
           select: "*",
           order: "id.desc",
-          limit: pageSize, // Tham số phân trang
-          offset: offset,  // Tham số phân trang
+          limit: pageSize,
+          offset: offset,
         });
 
-        console.log("resssssssssssss", res)
-
-        // 2. Cập nhật danh sách dự án
         if (mounted && Array.isArray(res)) {
           setProjects(res);
+
+          // Lấy tổng tiền quyên góp cho từng dự án từ API quyen_gop
+          const donationMap: ProjectDonationMap = {};
+          await Promise.all(
+            res.map(async (project) => {
+              try {
+                const donations = await apiClient.getQuyenGop({
+                  ma_du_an: `eq.${project.id}`,
+                  trang_thai_: `eq.thanh_cong`,
+                  select: "so_tien_thuc",
+                });
+                // Tính tổng so_tien_thuc
+                const total = Array.isArray(donations)
+                  ? donations.reduce((sum, d) => sum + (d.so_tien_thuc || 0), 0)
+                  : 0;
+                donationMap[project.id] = total;
+              } catch {
+                donationMap[project.id] = 0;
+              }
+            })
+          );
+          if (mounted) {
+            setProjectDonations(donationMap);
+          }
         }
-        // 3. Lấy tổng số dự án để tính toán phân trang
+
+        // Lấy tổng số dự án để tính toán phân trang
         const countRes = await apiClient.getDuAn({ select: "id" });
         if (mounted && Array.isArray(countRes)) {
           setTotalProjects(countRes.length);
@@ -52,11 +85,11 @@ export default function HomePage() {
         setIsLoading(false);
       }
     }
-    fetchProjects();
+    fetchData();
     return () => {
       mounted = false;
     };
-  }, [page, pageSize]); // Thêm pageSize vào dependencies
+  }, [page, pageSize]);
   // Pagination controls
   const totalPages = Math.ceil(totalProjects / pageSize);
 
@@ -127,90 +160,139 @@ export default function HomePage() {
 
           <div className="grid md:grid-cols-3 gap-8">
 
-            {projects?.map((project: DuAn, key: number) => {
+            {projects?.map((project: DuAn) => {
+              // Lấy tổng tiền đã quyên góp từ API quyen_gop (giống trang chi tiết)
+              const totalDonated = projectDonations[project.id] || 0;
 
               // Tính toán phần trăm quyên góp
               const progressPercentage = calculatePercentage(
-                project.so_tien_hien_tai,
+                totalDonated,
                 project.so_tien_muc_tieu
               );
 
-              // Định dạng tiền tệ
-              const currentAmountFormatted = formatNumber(project.so_tien_hien_tai);
-              const targetAmountFormatted = formatNumber(project.so_tien_muc_tieu);
+              // Định dạng tiền tệ - format VNĐ nhất quán
+              const currentAmountFormatted = formatMoney(totalDonated);
+              const targetAmountFormatted = formatMoney(project.so_tien_muc_tieu);
 
-              // Xác định mức độ khẩn cấp (ví dụ: ưu tiên > 7 là khẩn cấp)
-              const isUrgent = project.muc_do_uu_tien;
+              // Xác định mức độ khẩn cấp
+              const isUrgent = project.muc_do_uu_tien === 'khan_cap';
 
-              // Tách địa điểm (ví dụ: lấy tên địa điểm cuối cùng)
-              // Dữ liệu mẫu là "Xã Tả Van, Sapa, Lào Cai", ta lấy "Lào Cai"
-              const locationParts = project.dia_diem.split(',').map(s => s.trim());
-              const mainLocation = locationParts[locationParts.length - 1];
+              // Lấy tên danh mục từ categories
+              const category = categories.find(c => c.id === project.ma_danh_muc);
+              const categoryName = category?.ten || 'Chưa phân loại';
+
+              // Tách địa điểm - lấy phần cuối
+              const locationParts = project.dia_diem?.split(',').map(s => s.trim()) || [];
+              const mainLocation = locationParts[locationParts.length - 1] || project.dia_diem;
 
               // Sử dụng thu_vien_anh, nếu không có thì dùng ảnh mặc định
               const imageUrl = Array.isArray(project.thu_vien_anh)
                 ? project.thu_vien_anh[0] || '/default-project-image.jpg'
                 : project.thu_vien_anh || '/default-project-image.jpg';
 
+              // Tính số ngày còn lại
+              const daysRemaining = Math.ceil(
+                (new Date(project.ngay_ket_thuc).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+              );
+              const isExpired = daysRemaining < 0;
 
               return (
                 <Card
-                  key={project.id} // 💡 Sử dụng project.id làm key là tốt nhất
-                  className="overflow-hidden hover:shadow-xl transition-shadow duration-300 border-(--color-border)"
+                  key={project.id}
+                  className="overflow-hidden hover:shadow-xl transition-all duration-300 border-(--color-border) group"
                 >
-                  <div className="relative h-48 overflow-hidden">
+                  <div className="relative h-52 overflow-hidden">
                     <img
                       src={imageUrl}
                       alt={project.tieu_de}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
 
-                    {/* HIỂN THỊ KHẨN CẤP DỰA TRÊN DỮ LIỆU */}
+                    {/* Badge danh mục */}
+                    <div className="absolute top-4 left-4 bg-(--color-primary) text-white px-3 py-1 rounded-full text-sm font-medium shadow-md">
+                      {categoryName}
+                    </div>
+
+                    {/* Badge khẩn cấp */}
                     {isUrgent && (
-                      <div className="absolute top-4 right-4 bg-(--color-secondary) text-white px-3 py-1 rounded-full text-sm font-semibold">
-                        Khẩn Cấp
+                      <div className="absolute top-4 right-4 bg-(--color-secondary) text-white px-3 py-1 rounded-full text-sm font-semibold animate-pulse">
+                        🔥 Khẩn Cấp
+                      </div>
+                    )}
+
+                    {/* Badge hết hạn */}
+                    {isExpired && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <span className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">
+                          Đã kết thúc
+                        </span>
                       </div>
                     )}
                   </div>
 
-                  <CardHeader>
-                    <CardTitle className="text-xl text-balance">{project?.tieu_de}</CardTitle>
-                    {/* HIỂN THỊ ĐỊA ĐIỂM THỰC TẾ (Giả định ma_danh_muc cần gọi thêm API khác) */}
-                    <CardDescription>
-                      {/* Giả định: Danh mục: Giáo dục | Địa điểm: Lào Cai */}
-                      {`Danh Mục ID: ${project.ma_danh_muc} • ${mainLocation}`}
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg text-balance line-clamp-2 min-h-[3.5rem]">
+                      {project?.tieu_de}
+                    </CardTitle>
+                    <CardDescription className="flex items-center gap-4 text-sm">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-4 h-4" />
+                        {mainLocation}
+                      </span>
+                      {!isExpired && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          Còn {daysRemaining} ngày
+                        </span>
+                      )}
                     </CardDescription>
                   </CardHeader>
 
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 pt-0">
                     <div className="space-y-2">
-                      {/* TIẾN ĐỘ QUYÊN GÓP */}
-                      <div className="flex justify-between text-sm">
-                        <span className="text-(--color-foreground-secondary)">Đã quyên góp</span>
-                        {/* SỬ DỤNG TIẾN ĐỘ TÍNH TOÁN */}
-                        <span className="font-semibold text-(--color-primary)">{progressPercentage}%</span>
+                      {/* Thanh tiến độ */}
+                      <div className="w-full bg-(--color-border) rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-(--color-primary) to-(--color-success) h-2.5 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(progressPercentage, 100)}%` }}
+                        />
                       </div>
 
-                      {/* THANH TIẾN ĐỘ */}
-                      <div className="w-full bg-(--color-border) rounded-full h-2">
-                        {/* SỬ DỤNG TIẾN ĐỘ TÍNH TOÁN */}
-                        <div className="bg-(--color-primary) h-2 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
+                      {/* Thông tin số tiền */}
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm text-(--color-foreground-secondary)">Đã đạt</p>
+                          <p className="font-bold text-(--color-primary) text-lg">{currentAmountFormatted}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-(--color-foreground-secondary)">Mục tiêu</p>
+                          <p className="font-semibold text-(--color-foreground)">{targetAmountFormatted}</p>
+                        </div>
                       </div>
 
-                      {/* SỐ TIỀN */}
-                      <div className="flex justify-between text-sm">
-                        {/* SỬ DỤNG TIỀN ĐỊNH DẠNG */}
-                        <span className="font-semibold">{currentAmountFormatted}</span>
-                        {/* SỬ DỤNG TIỀN ĐỊNH DẠNG */}
-                        <span className="text-(--color-foreground-secondary)">/ {targetAmountFormatted}</span>
+                      {/* Phần trăm */}
+                      <div className="text-center">
+                        <span className="inline-block bg-(--color-background-tertiary) text-(--color-primary) px-3 py-1 rounded-full text-sm font-semibold">
+                          {progressPercentage}% hoàn thành
+                        </span>
                       </div>
                     </div>
 
-                    {/* LINK */}
+                    {/* Nút quyên góp */}
                     <Link href={`/du-an/${project.id}`}>
-                      <Button className="w-full bg-(--color-primary) hover:bg-(--color-primary-hover)">
-                        Quyên Góp Ngay
-                      </Button>
+                      {isExpired ? (
+                        <Button
+                          className="w-full bg-gray-400 cursor-not-allowed"
+                          disabled
+                        >
+                          Chiến dịch đã kết thúc
+                        </Button>
+                      ) : (
+                        <Button className="w-full bg-(--color-primary) hover:bg-(--color-primary-hover) transition-colors">
+                          <Heart className="w-4 h-4 mr-2" />
+                          Quyên Góp Ngay
+                        </Button>
+                      )}
                     </Link>
                   </CardContent>
                 </Card>
@@ -410,12 +492,21 @@ export default function HomePage() {
   )
 }
 
-function formatNumber(n: number) {
-  // Format large VND numbers nicely
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)} tỷ`
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000) return n.toLocaleString()
-  return String(n)
+// Format tiền VNĐ - đảm bảo số dương và format nhất quán
+function formatMoney(n: number) {
+  // Đảm bảo số không âm
+  const amount = Math.abs(n || 0);
+
+  if (amount >= 1_000_000_000) {
+    return `${(amount / 1_000_000_000).toFixed(1)} tỷ`;
+  }
+  if (amount >= 1_000_000) {
+    return `${(amount / 1_000_000).toFixed(0)} triệu`;
+  }
+  if (amount >= 1_000) {
+    return `${new Intl.NumberFormat('vi-VN').format(amount)} đ`;
+  }
+  return `${amount} đ`;
 }
 
 // function StatsBlock() {

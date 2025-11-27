@@ -147,6 +147,8 @@ export default function PaymentReturnPage() {
   //   );
   // }
 
+  const projectId = localStorage.getItem('pending_payment_project_id');
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-2xl w-full">
@@ -238,7 +240,7 @@ export default function PaymentReturnPage() {
           </button>
           {isSuccess ? (
             <button
-              onClick={() => router.push('/my-contributions')}
+              onClick={() => router.push(`/du-an/${projectId}`)}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200"
             >
               Xem đóng góp

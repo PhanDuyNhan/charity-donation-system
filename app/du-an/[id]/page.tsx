@@ -497,7 +497,7 @@ export default function ProjectDetailPage() {
                             borderBottom: '1px solid #e5e7eb',
                           }}
                         >
-                          <div style={{
+                          {/* <div style={{
                             width: '48px',
                             height: '48px',
                             borderRadius: '50%',
@@ -510,7 +510,7 @@ export default function ProjectDetailPage() {
                             fontSize: '14px'
                           }}>
                             #{d.id}
-                          </div>
+                          </div> */}
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <a
