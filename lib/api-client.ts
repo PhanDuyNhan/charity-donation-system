@@ -159,7 +159,15 @@ export class ApiClient {
   // ==================== NGƯỜI DÙNG ====================
   static async getNguoiDung(params?: Record<string, any>): Promise<NguoiDung[]> {
     const ep = getEndpoint("NGUOI_DUNG", "nguoi_dung")
-    return this.get<NguoiDung[]>(ep, params)
+    try {
+      // Sử dụng getPublic để match với curl command (không cần Authorization)
+      const result = await this.getPublic<NguoiDung[]>(ep, params)
+      // Đảm bảo trả về mảng
+      return Array.isArray(result) ? result : []
+    } catch (error) {
+      console.error("❌ Lỗi lấy danh sách người dùng:", error)
+      throw error
+    }
   }
 
   // CREATE should be POST (not PATCH) — sửa để tạo user đúng REST
@@ -242,7 +250,7 @@ export class ApiClient {
   // ==================== SỰ KIỆN ====================
   static async getSuKien(params?: Record<string, any>): Promise<SuKien[]> {
     const ep = getEndpoint("SU_KIEN", "su_kien")
-    return this.get<SuKien[]>(ep, params)
+    return this.getPublic<SuKien[]>(ep, params)
   }
 
   static async createSuKien(data: Partial<SuKien>): Promise<SuKien> {
@@ -307,7 +315,7 @@ export class ApiClient {
   // ==================== TÌNH NGUYỆN VIÊN ====================
   static async getTinhNguyenVien(params?: Record<string, any>): Promise<TinhNguyenVien[]> {
     const ep = getEndpoint("TINH_NGUYEN_VIEN", "tinh_nguyen_vien")
-    return this.get<TinhNguyenVien[]>(ep, params)
+    return this.getPublic<TinhNguyenVien[]>(ep, params)
   }
 
   static async createTinhNguyenVien(data: Partial<TinhNguyenVien>): Promise<TinhNguyenVien> {
@@ -356,7 +364,7 @@ export class ApiClient {
   // get Chi Tiet Giải ngân
   static async getChiTietGiaiNgan(params?: Record<string, any>): Promise<GiaiNgan[]> {
     const basePath = getEndpoint("GIAI_NGAN", "giai_ngan")
-    return this.get<GiaiNgan[]>(basePath, params)
+    return this.getPublic<GiaiNgan[]>(basePath, params)
   }
 
   // update trang thái giải ngân 
@@ -372,7 +380,7 @@ export class ApiClient {
   // thông báo
    static async getThongBao(params?: Record<string, any>): Promise<Notification[]> {
     const ep = getEndpoint("THONG_BAO", "thong_bao")
-    return this.get<Notification[]>(ep, params)
+    return this.getPublic<Notification[]>(ep, params)
   }
 
 }

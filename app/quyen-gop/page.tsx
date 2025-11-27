@@ -34,6 +34,8 @@ export default function DonationPage() {
   const [project, setProject] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [totalDonated, setTotalDonated] = useState(0)
+  const [donorCount, setDonorCount] = useState(0)
 
   // Form states
   const [step, setStep] = useState<1 | 2 | 3>(2) // Mặc định step 2 như HTML
@@ -62,6 +64,24 @@ export default function DonationPage() {
           return
         }
         setProject(res[0])
+
+        // Fetch donations from quyen_gop API
+        try {
+          const donations = await apiClient.getQuyenGop({
+            ma_du_an: `eq.${projectId}`,
+            trang_thai_: `eq.thanh_cong`,
+            select: "so_tien,so_tien_thuc",
+          })
+          if (Array.isArray(donations)) {
+            // Tính tổng tiền đã quyên góp
+            const total = donations.reduce((sum: number, d: any) => sum + (d.so_tien_thuc || d.so_tien || 0), 0)
+            setTotalDonated(total)
+            // Đếm số người ủng hộ
+            setDonorCount(donations.length)
+          }
+        } catch (donationErr) {
+          console.error("Error loading donations:", donationErr)
+        }
 
         // Pre-fill user info if logged in
         if (user) {
@@ -92,7 +112,7 @@ export default function DonationPage() {
 
   const progress =
     project.so_tien_muc_tieu > 0
-      ? (project.so_tien_hien_tai / project.so_tien_muc_tieu) * 100
+      ? (totalDonated / project.so_tien_muc_tieu) * 100
       : 0
 
   const daysRemaining = Math.ceil(
@@ -226,15 +246,15 @@ export default function DonationPage() {
           </div>
           <div className={styles.campaignStats}>
             <div className={styles.statItem}>
-              <h3>{formatMoney(project.so_nguoi_thu_huong || 0)}</h3>
-              <p>Người thụ hưởng</p>
+              <h3>{donorCount}</h3>
+              <p>Người ủng hộ</p>
             </div>
             <div className={styles.statItem}>
-              <h3>{formatMoney(project.so_tien_hien_tai)}</h3>
+              <h3>{formatMoney(totalDonated)}đ</h3>
               <p>Đã quyên góp</p>
             </div>
             <div className={styles.statItem}>
-              <h3>{daysRemaining} ngày</h3>
+              <h3>{daysRemaining > 0 ? `${daysRemaining} ngày` : "Đã kết thúc"}</h3>
               <p>Còn lại</p>
             </div>
           </div>
@@ -492,7 +512,7 @@ export default function DonationPage() {
                 </div>
                 <div className={styles.progressText}>
                   <span className={styles.raised}>
-                    {formatMoney(project.so_tien_hien_tai)}đ
+                    {formatMoney(totalDonated)}đ
                   </span>
                   <span className={styles.goal}>
                     / {formatMoney(project.so_tien_muc_tieu)}đ

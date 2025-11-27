@@ -48,11 +48,14 @@ export default function AdminNguoiDungPage() {
   async function fetchNguoiDung() {
     setLoading(true)
     try {
+      console.log("🔄 Đang tải danh sách người dùng...")
       const res = await apiClient.getNguoiDung()
+      console.log("✅ Kết quả API nguoi_dung:", res)
       setNguoiDungs(Array.isArray(res) ? res : [])
-    } catch (err) {
-      console.error("Lỗi lấy người dùng:", err)
-      alert("Không thể tải danh sách người dùng.")
+    } catch (err: any) {
+      console.error("❌ Lỗi lấy người dùng:", err)
+      const errorMessage = err?.message || "Không thể tải danh sách người dùng."
+      alert(`Lỗi: ${errorMessage}`)
     } finally {
       setLoading(false)
     }

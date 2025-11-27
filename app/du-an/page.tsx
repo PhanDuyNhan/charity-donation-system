@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, MapPin, Calendar, XCircle } from "lucide-react"
+import { Search, Filter, MapPin, Calendar, XCircle, Clock, Heart } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
 import {
   Pagination,
@@ -17,6 +17,38 @@ import {
   PaginationPrevious,
   PaginationNext,
 } from "@/components/ui/pagination"
+
+// Map donation totals per project
+type ProjectDonationMap = Record<number, number>
+
+// Format tiền VNĐ - đảm bảo số dương và format nhất quán (giống trang chủ)
+function formatMoney(n: number | undefined | null): string {
+  const amount = Math.abs(n || 0)
+
+  if (amount >= 1_000_000_000) {
+    return `${(amount / 1_000_000_000).toFixed(1)} tỷ`
+  }
+  if (amount >= 1_000_000) {
+    return `${(amount / 1_000_000).toFixed(0)} triệu`
+  }
+  if (amount >= 1_000) {
+    return `${new Intl.NumberFormat("vi-VN").format(amount)} đ`
+  }
+  return `${amount} đ`
+}
+
+// Tính số ngày còn lại
+function getDaysRemaining(endDate: string): number {
+  const end = new Date(endDate)
+  const now = new Date()
+  const diff = end.getTime() - now.getTime()
+  return Math.ceil(diff / (1000 * 60 * 60 * 24))
+}
+
+// Kiểm tra dự án hết hạn
+function isProjectExpired(endDate: string): boolean {
+  return getDaysRemaining(endDate) < 0
+}
 
 // Hàm loại bỏ dấu tiếng Việt và chuẩn hoá
 function normalizeString(str: string | undefined) {
@@ -106,6 +138,7 @@ export default function DuAnPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [categories, setCategories] = useState<any[]>([])
   const [provinces, setProvinces] = useState<any[]>([])
+  const [projectDonations, setProjectDonations] = useState<ProjectDonationMap>({})
 
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("__all")
@@ -141,6 +174,29 @@ export default function DuAnPage() {
         setFilteredProjects(enrichedProjects)
         setCategories(danhMucRes)
         setProvinces(provRes)
+
+        // Fetch donations for each project from quyen_gop API
+        const donationMap: ProjectDonationMap = {}
+        await Promise.all(
+          (duAnRes || []).map(async (project: any) => {
+            try {
+              const donations = await apiClient.getQuyenGop({
+                ma_du_an: `eq.${project.id}`,
+                trang_thai_: `eq.thanh_cong`,
+                select: "so_tien,so_tien_thuc",
+              })
+              // Tính tổng: ưu tiên so_tien_thuc nếu có, không thì dùng so_tien
+              const total = Array.isArray(donations)
+                ? donations.reduce((sum, d: any) => sum + (d.so_tien_thuc || d.so_tien || 0), 0)
+                : 0
+              donationMap[project.id] = total
+            } catch (err) {
+              console.error(`Error fetching donations for project ${project.id}:`, err)
+              donationMap[project.id] = 0
+            }
+          })
+        )
+        setProjectDonations(donationMap)
       } catch (err) {
         console.error("❌ Lỗi khi fetch dữ liệu:", err)
         setError("Không thể tải danh sách dự án.")
@@ -331,79 +387,125 @@ export default function DuAnPage() {
             <>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
                 {paginatedProjects.map((project) => {
-                  const progress =
-                    project.so_tien_muc_tieu > 0
-                      ? (project.so_tien_hien_tai / project.so_tien_muc_tieu) * 100
-                      : 0
+                  // Lấy số tiền đã quyên góp từ API
+                  const donatedAmount = projectDonations[project.id] || 0
+                  const targetAmount = project.so_tien_muc_tieu || 0
+                  const progress = targetAmount > 0 ? Math.min(Math.round((donatedAmount / targetAmount) * 100), 100) : 0
 
                   const mainImage = getFirstImage(project.thu_vien_anh)
+
+                  // Tìm tên danh mục
+                  const categoryObj = categories.find(
+                    (c) => c.id === project.ma_danh_muc || c.ma_danh_muc === project.ma_danh_muc
+                  )
+                  const categoryName = categoryObj?.ten || "Dự án"
+
+                  // Kiểm tra hết hạn và số ngày còn lại
+                  const daysRemaining = getDaysRemaining(project.ngay_ket_thuc)
+                  const isExpired = isProjectExpired(project.ngay_ket_thuc)
+                  const isUrgent = project.muc_do_uu_tien === "khan_cap"
+
+                  // Tách địa điểm - lấy phần cuối
+                  const locationParts = project.dia_diem?.split(",").map((s: string) => s.trim()) || []
+                  const mainLocation = locationParts[locationParts.length - 1] || project.dia_diem || "Việt Nam"
 
                   return (
                     <Card
                       key={project.id}
-                      className="overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col h-full"
+                      className="overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col h-full group"
                     >
-                      <div className="relative h-48 overflow-hidden">
+                      <div className="relative h-52 overflow-hidden">
                         <img
                           src={mainImage}
                           alt={project.tieu_de}
-                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
-                        <Badge className="absolute top-4 right-4 bg-secondary text-white shadow-md">
-                          {project.trang_thai === "hoat_dong" ? "Đang hoạt động" : "Khác"}
-                        </Badge>
+
+                        {/* Badge danh mục */}
+                        <div className="absolute top-4 left-4 bg-primary text-white px-3 py-1 rounded-full text-sm font-medium shadow-md">
+                          {categoryName}
+                        </div>
+
+                        {/* Badge khẩn cấp */}
+                        {isUrgent && !isExpired && (
+                          <div className="absolute top-4 right-4 bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-semibold animate-pulse">
+                            🔥 Khẩn Cấp
+                          </div>
+                        )}
+
+                        {/* Badge hết hạn - overlay toàn bộ ảnh */}
+                        {isExpired && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <span className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">
+                              Đã kết thúc
+                            </span>
+                          </div>
+                        )}
                       </div>
 
-                      <CardHeader className="pb-2">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                          <Badge variant="outline">
-                            Ưu tiên: {project.muc_do_yeu_tien}
-                          </Badge>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg line-clamp-2 min-h-[3.5rem] group-hover:text-primary transition-colors">
+                          {project.tieu_de}
+                        </CardTitle>
+                        <CardDescription className="flex items-center gap-4 text-sm">
                           <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {project.dia_diem}
+                            <MapPin className="w-4 h-4" />
+                            {mainLocation}
                           </span>
-                        </div>
-                        <CardTitle className="text-lg">{project.tieu_de}</CardTitle>
-                        <CardDescription className="line-clamp-2">
-                          {project.mo_ta}
+                          {!isExpired && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              Còn {daysRemaining} ngày
+                            </span>
+                          )}
                         </CardDescription>
                       </CardHeader>
 
-                      <CardContent className="flex flex-col justify-between flex-1 space-y-4">
-                        <div className="space-y-3">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Đã quyên góp</span>
-                            <span className="font-semibold text-primary">
-                              {progress.toFixed(0)}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-secondary/20 rounded-full h-2">
+                      <CardContent className="flex flex-col justify-between flex-1 space-y-4 pt-0">
+                        <div className="space-y-2">
+                          {/* Thanh tiến độ */}
+                          <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                             <div
-                              className="bg-primary h-2 rounded-full transition-all"
+                              className="bg-gradient-to-r from-primary to-green-500 h-2.5 rounded-full transition-all duration-500"
                               style={{ width: `${progress}%` }}
                             />
                           </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="font-semibold">
-                              {project.so_tien_hien_tai.toLocaleString("vi-VN")} đ
-                            </span>
-                            <span className="text-muted-foreground">
-                              / {project.so_tien_muc_tieu.toLocaleString("vi-VN")} đ
-                            </span>
+
+                          {/* Thông tin số tiền */}
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Đã đạt</p>
+                              <p className="font-bold text-primary text-lg">{formatMoney(donatedAmount)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-muted-foreground">Mục tiêu</p>
+                              <p className="font-semibold">{formatMoney(targetAmount)}</p>
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="h-4 w-4" />
-                            <span>
-                              {new Date(project.ngay_bat_dau).toLocaleDateString("vi-VN")} -{" "}
-                              {new Date(project.ngay_ket_thuc).toLocaleDateString("vi-VN")}
+                          {/* Phần trăm */}
+                          <div className="text-center">
+                            <span className="inline-block bg-gray-100 text-primary px-3 py-1 rounded-full text-sm font-semibold">
+                              {progress}% hoàn thành
                             </span>
                           </div>
                         </div>
 
+                        {/* Nút quyên góp */}
                         <Link href={`/du-an/${project.id}`} className="mt-auto">
-                          <Button className="w-full">Quyên Góp Ngay</Button>
+                          {isExpired ? (
+                            <Button
+                              className="w-full bg-gray-400 cursor-not-allowed"
+                              disabled
+                            >
+                              Chiến dịch đã kết thúc
+                            </Button>
+                          ) : (
+                            <Button className="w-full bg-primary hover:bg-primary/90 transition-colors">
+                              <Heart className="w-4 h-4 mr-2" />
+                              Quyên Góp Ngay
+                            </Button>
+                          )}
                         </Link>
                       </CardContent>
                     </Card>

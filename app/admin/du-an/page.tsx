@@ -305,6 +305,22 @@ export default function AdminDuAnPage() {
     return { total, hoat_dong, hoan_thanh, tam_dung }
   }, [duAns])
 
+  // Tính tổng số tiền quyên góp thực tế cho mỗi dự án từ bảng quyen_gop
+  const projectDonationsMap = useMemo(() => {
+    const map: Record<number, number> = {}
+    quyenGops.forEach((q: any) => {
+      // Chỉ tính các giao dịch thành công
+      if (q.trang_thai_ === "thanh_cong") {
+        const projectId = q.ma_du_an?.id || q.ma_du_an
+        if (projectId) {
+          const amount = Number(q.so_tien_thuc || q.so_tien || 0)
+          map[projectId] = (map[projectId] || 0) + amount
+        }
+      }
+    })
+    return map
+  }, [quyenGops])
+
 
   // handle Giai Ngan
   async function handleGiaiNgan(data: any) {
@@ -557,7 +573,7 @@ export default function AdminDuAnPage() {
                         <td className="py-3 px-6 text-xs">{getCategoryName(d.ma_danh_muc)}</td> {/* Cột Danh mục - làm nhỏ hơn */}
                         <td className="py-3 px-6 text-xs">{d.ngay_bat_dau} {'->'} {d.ngay_ket_thuc}</td> {/* Cột Ngày - làm nhỏ hơn và mỏng hơn */}
                         <td className="py-3 px-6 text-xs">{Number(d.so_tien_muc_tieu || 0).toLocaleString()}</td> {/* Cột Số tiền - làm nhỏ hơn, dùng font monospace để căn chỉnh số đẹp hơn */}
-                        <td className="py-3 px-6 text-xs">{Number(d.so_tien_hien_tai || 0).toLocaleString()}</td> {/* Cột Số tiền hiện tại - làm nhỏ hơn, màu nổi bật */}
+                        <td className="py-3 px-6 text-xs">{Number(projectDonationsMap[Number(d.id)] || 0).toLocaleString()}</td> {/* Số tiền quyên góp thực tế từ quyen_gop */}
                         <td className="py-3 px-6 text-xs">
                           {d?.giai_ngan && d.giai_ngan.length > 0 ? (
 
