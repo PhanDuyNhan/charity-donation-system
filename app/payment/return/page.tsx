@@ -129,17 +129,17 @@ export default function PaymentReturnPage() {
     return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
   };
 
-  if (isProcessing) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Đang xử lý thanh toán</h2>
-          <p className="text-gray-600">Vui lòng đợi trong giây lát...</p>
-        </div>
-      </div>
-    );
-  }
+  // if (isProcessing) {
+  //   return (
+  //     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+  //       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+  //         <Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
+  //         <h2 className="text-2xl font-bold text-gray-800 mb-2">Đang xử lý thanh toán</h2>
+  //         <p className="text-gray-600">Vui lòng đợi trong giây lát...</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
