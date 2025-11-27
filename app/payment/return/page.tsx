@@ -101,7 +101,7 @@ export default function PaymentReturnPage() {
           console.log('Payment saved:', result);
 
           // Xóa projectId khỏi localStorage sau khi thanh toán thành công
-          localStorage.removeItem('pending_payment_project_id');
+          // localStorage.removeItem('pending_payment_project_id');
         }
       } catch (err) {
         console.error('Error processing payment:', err);
