@@ -53,6 +53,7 @@ export class ApiClient {
     const defaultHeaders: Record<string, string> = {
       "Content-Type": "application/json",
       Accept: "application/json",
+      "Range-Unit": "items",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     }
 
@@ -262,7 +263,7 @@ export class ApiClient {
   // ==================== TIN TỨC ====================
   static async getTinTuc(params?: Record<string, any>): Promise<TinTuc[]> {
     const ep = getEndpoint("TIN_TUC", "tin_tuc")
-    return this.get<TinTuc[]>(ep, params)
+    return this.getPublic<TinTuc[]>(ep, params)
   }
 
   static async createTinTuc(data: Partial<TinTuc>): Promise<TinTuc> {
