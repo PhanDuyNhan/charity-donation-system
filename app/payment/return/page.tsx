@@ -71,12 +71,21 @@ export default function PaymentReturnPage() {
         if (isPaymentSuccess) {
           // Chuyển đổi số tiền (VNPay trả về số tiền * 100)
           const amount = parseInt(params.vnp_Amount) / 100;
-          
-           const authStorage = localStorage.getItem('auth-storage')
-           const userId = authStorage ? JSON.parse(authStorage).state.user.id : null
+
+          // Lấy userId từ auth-storage
+          const authStorage = localStorage.getItem('auth-storage')
+          const userId = authStorage ? JSON.parse(authStorage).state.user.id : null
+
+          // Lấy projectId từ localStorage (đã lưu trước khi redirect đến VNPay)
+          const projectId = localStorage.getItem('pending_payment_project_id')
+
+          if (!projectId) {
+            throw new Error('Không tìm thấy thông tin dự án');
+          }
+
           const paymentData: PaymentData = {
-            maNguoiDung: userId, 
-            maDuAn: 1, 
+            maNguoiDung: userId,
+            maDuAn: parseInt(projectId),
             soTien: amount,
             phuongThucThanhToan: 'VNPAY',
             trangThaiThanhToan: 'THANH_CONG',
@@ -88,14 +97,11 @@ export default function PaymentReturnPage() {
           };
 
           // Gọi API để lưu thông tin thanh toán
-          const response = await apiClient.handlePayment(paymentData);
-
-          if (!response.ok) {
-            throw new Error('Không thể lưu thông tin thanh toán');
-          }
-
-          const result = await response.json();
+          const result = await apiClient.handlePayment(paymentData);
           console.log('Payment saved:', result);
+
+          // Xóa projectId khỏi localStorage sau khi thanh toán thành công
+          localStorage.removeItem('pending_payment_project_id');
         }
       } catch (err) {
         console.error('Error processing payment:', err);

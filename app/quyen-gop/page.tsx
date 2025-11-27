@@ -27,6 +27,7 @@ export default function DonationPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const projectId = searchParams.get("project")
+  console.log("🚀 ~ DonationPage ~ projectId:", projectId)
 
   const { user } = useAuthStore()
 
@@ -172,6 +173,8 @@ export default function DonationPage() {
       const response = await apiClient.createPayment(paymentData)
 
       if (response && response.vnpUrl) {
+        // Lưu projectId vào localStorage để sử dụng khi VNPay redirect về
+        localStorage.setItem('pending_payment_project_id', projectId!)
         // Redirect to VNPay payment page
         window.location.href = response.vnpUrl
       } else {
