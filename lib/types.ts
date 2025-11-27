@@ -10,7 +10,7 @@ export type MucDoUuTien = "khan_cap" | "cao" | "trung_binh" | "thap"
 
 export type PhuongThucThanhToan = "vnpay" | "momo" | "tien_ma_hoa" | "chuyen_khoan_ngan_hang" | "tien_mat"
 
-export type TrangThaiThanhToan = "cho_xu_ly" | "dang_xu_ly" | "hoan_thanh" | "that_bai" | "huy_bo" | "hoan_tien"
+export type TrangThaiThanhToan = "cho_xu_ly" | "dang_xu_ly" | "thanh_cong" | "that_bai" | "huy_bo" | "hoan_tien"
 
 export type TrangThaiSuKien = "sap_dien_ra" | "dang_dien_ra" | "da_ket_thuc" | "huy_bo"
 
@@ -66,12 +66,12 @@ export interface DuAn {
 
 export interface QuyenGop {
   id: number
-  ma_nguoi_dung?: number
-  ma_du_an: number
+  ma_nguoi_dung?: NguoiDung
+  ma_du_an: DuAn
   so_tien: number
   don_vi_tien_te: string
   phuong_thuc_thanh_toan: PhuongThucThanhToan
-  trang_thai_thanh_toan: TrangThaiThanhToan
+  trang_thai_: TrangThaiThanhToan
   ma_giao_dich?: string
   duong_dan_bien_lai?: string
   loi_nhan?: string
@@ -232,4 +232,14 @@ export interface ChiTietGiaiNgan {
   mo_ta : string,
   so_tien : number,
   ma_giai_ngan : number
+}
+
+
+export interface Notification {
+  id: number;
+  noi_dung: string;
+  ma_nguoi_dung: number;
+  tieu_de: string;
+  da_doc: boolean;
+  ngay_tao: string;
 }

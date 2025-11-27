@@ -21,7 +21,7 @@ export function DonationForm({ projectId, projectName }: DonationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const presetAmounts = [50000, 100000, 500000, 1000000]
-
+  console.log("projectIDDDDDDD", projectId)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -33,6 +33,7 @@ export function DonationForm({ projectId, projectName }: DonationFormProps) {
       }
       console.log("body", body)
       const res = await apiClient.createPayment(body)
+      // loca
       console.log("Kết quả quyên góp:", res.vnpUrl)
       window.location.href = res.vnpUrl
     } 

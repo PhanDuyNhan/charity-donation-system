@@ -71,14 +71,12 @@ export default function PaymentReturnPage() {
         if (isPaymentSuccess) {
           // Chuyển đổi số tiền (VNPay trả về số tiền * 100)
           const amount = parseInt(params.vnp_Amount) / 100;
-          // const transactionFee = amount * 0.02; // 2% phí giao dịch
-          // const actualAmount = amount - transactionFee;
-
-          // Chuẩn bị dữ liệu gửi lên API
-          // Lưu ý: Bạn cần lấy maNguoiDung và maDuAn từ session/context/localStorage
+          
+           const authStorage = localStorage.getItem('auth-storage')
+           const userId = authStorage ? JSON.parse(authStorage).state.user.id : null
           const paymentData: PaymentData = {
-            maNguoiDung: 1, // TODO: Lấy từ session/context
-            maDuAn: 1, // TODO: Lấy từ session/localStorage khi tạo thanh toán
+            maNguoiDung: userId, 
+            maDuAn: 1, 
             soTien: amount,
             phuongThucThanhToan: 'VNPAY',
             trangThaiThanhToan: 'THANH_CONG',

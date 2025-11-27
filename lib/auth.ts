@@ -75,6 +75,7 @@ export const authService = {
       useAuthStore.getState().login(user, token)
       return { user, token }
     } catch (error: any) {
+      console.log("gggggggggggggggggggggggggggggg", error.message)
       throw new Error(error.message || "Đăng nhập thất bại")
     }
   },

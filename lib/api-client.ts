@@ -74,7 +74,6 @@ export class ApiClient {
         } catch {
           errText = ""
         }
-        console.error("❌ API Error:", response.status, errText)
 
         try {
           if (typeof window !== "undefined") {
@@ -83,20 +82,19 @@ export class ApiClient {
           }
         } catch { }
 
-        if (typeof window !== "undefined") {
-          if (!window.location.pathname.startsWith("/login")) {
-            // add a query flag so UI can show expired message
-            window.location.href = "/login?expired=1"
-          }
-        }
+        // if (typeof window !== "undefined") {
+        //   if (!window.location.pathname.startsWith("/login")) {
+        //     // add a query flag so UI can show expired message
+        //     window.location.href = "/login?expired=1"
+        //   }
+        // }
 
-        throw new Error(`API Error: 401 Unauthorized - ${errText}`)
+        throw new Error(errText)
       }
 
       if (!response.ok) {
         const errText = await response.text()
-        console.error("❌ API Error:", response.status, errText)
-        throw new Error(`API Error: ${response.status} ${response.statusText} - ${errText}`)
+        throw new Error(errText)
       }
 
       if (response.status === 204) return {} as T
@@ -369,6 +367,17 @@ export class ApiClient {
     return this.patch<any>(endpointWithQuery, data);
   }
 
+
+  // thông báo
+   static async getThongBao(params?: Record<string, any>): Promise<Notification[]> {
+    const ep = getEndpoint("THONG_BAO", "thong_bao")
+    return this.get<Notification[]>(ep, params)
+  }
+
 }
+
+
+
+
 
 export const apiClient = ApiClient

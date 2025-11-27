@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Heart } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { usePathname } from "next/navigation" // 👈 thêm dòng này
+import NotificationIcon from "./icon/NotificationIcon"
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth()
@@ -47,6 +48,9 @@ export default function Navbar() {
 
         {/* Auth buttons */}
         <div className="flex items-center gap-3">
+          {isAuthenticated && user && (
+            <NotificationIcon /> 
+          )}
           {isAuthenticated && user ? (
             <>
               <span className="text-sm text-gray-700">Xin chào, {user.ten}</span>

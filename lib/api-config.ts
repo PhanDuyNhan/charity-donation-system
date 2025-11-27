@@ -13,6 +13,7 @@ export const API_CONFIG = {
     TINH_NGUYEN_VIEN: "tinh_nguyen_vien",
     GIAI_NGAN: "giai_ngan",
     CHI_TIET_GIAI_NGAN: "chi_tiet_giai_ngan",
+    THONG_BAO : "thong_bao"
   },
 }
 

@@ -65,13 +65,17 @@ export default function AdminQuyenGopPage() {
   async function loadAll() {
     setLoading(true)
     try {
-      const [qRes, pRes] = await Promise.all([apiClient.getQuyenGop(), apiClient.getDuAn()])
+      const [qRes, pRes] = await Promise.all([apiClient.getQuyenGop
+        (
+          { select: "*,ma_nguoi_dung:nguoi_dung(ho,ten,email, so_dien_thoai),ma_du_an:du_an(id, tieu_de)" }
+        ), apiClient.getDuAn()])
+      console.log("qRessssss", qRes)
       setQuyens(Array.isArray(qRes) ? qRes : [])
       setDuAns(Array.isArray(pRes) ? pRes : [])
       const map: Record<number, string> = {}
-      ;(Array.isArray(pRes) ? pRes : []).forEach((p: DuAn) => {
-        if (p.id != null) map[p.id] = p.tieu_de || String(p.id)
-      })
+        ; (Array.isArray(pRes) ? pRes : []).forEach((p: DuAn) => {
+          if (p.id != null) map[p.id] = p.tieu_de || String(p.id)
+        })
       setProjectsMap(map)
     } catch (err) {
       console.error("Lỗi khi tải dữ liệu:", err)
@@ -106,16 +110,16 @@ export default function AdminQuyenGopPage() {
     return quyens
       .filter((item) => {
         if (!q) return true
-        const donor = removeVietnameseTones(item.ten_nguoi_quyen_gop || item.email_nguoi_quyen_gop || "")
-        const projectName = removeVietnameseTones(projectsMap[item.ma_du_an ?? -1] || "")
+        const donor = removeVietnameseTones(item.ma_nguoi_dung?.ten || item.ma_nguoi_dung?.email || "")
+        const projectName = removeVietnameseTones(projectsMap[item.ma_du_an?.id ?? -1] || "")
         return donor.includes(q) || projectName.includes(q)
       })
-      .filter((item) => (projectId ? item.ma_du_an === projectId : true))
+      .filter((item) => (projectId ? item?.ma_du_an?.id === projectId : true))
       .filter((item) => (method ? item.phuong_thuc_thanh_toan === method : true))
-      .filter((item) => (status ? item.trang_thai_thanh_toan === status : true))
+      .filter((item) => (status ? item?.trang_thai_ === status : true))
       .filter((item) => {
         if (!startDate && !endDate) return true
-        const dateStr = item.ngay_tao ?? item.ngay_hoan_thanh ?? item.ngay_cap_nhat
+        const dateStr = item.ngay_tao ?? item?.trang_thai_ ?? item.ngay_cap_nhat
         if (!dateStr) return false
         const dt = new Date(dateStr)
         if (Number.isNaN(dt.getTime())) return false
@@ -166,26 +170,26 @@ export default function AdminQuyenGopPage() {
   function exportFilteredCsv() {
     const rows = filtered.map((q) => ({
       id: q.id,
-      nguoi_quyen: q.ten_nguoi_quyen_gop ?? q.email_nguoi_quyen_gop ?? "-",
-      du_an: projectsMap[q.ma_du_an ?? -1] ?? q.ma_du_an ?? "-",
+      nguoi_quyen: q?.ma_nguoi_dung?.ten ?? q?.ma_nguoi_dung?.email ?? "-",
+      du_an: projectsMap[q?.ma_du_an?.id ?? -1] ?? q.ma_du_an ?? "-",
       so_tien: q.so_tien ?? 0,
       phuong_thuc: q.phuong_thuc_thanh_toan ?? "-",
-      trang_thai: q.trang_thai_thanh_toan ?? "-",
+      trang_thai: q?.trang_thai_ ?? "-",
       ngay_tao: q.ngay_tao ?? "-",
       loi_nhan: q.loi_nhan ?? "",
     }))
     exportCsv(rows)
   }
-
+  console.log("ffffffffffffffffffff", paginated)
   // print
   function printReport() {
     const rowsHtml = filtered.map(q => `
       <tr>
-        <td style="padding:6px;border:1px solid #ddd">${q.ten_nguoi_quyen_gop ?? q.email_nguoi_quyen_gop ?? "-"}</td>
-        <td style="padding:6px;border:1px solid #ddd">${projectsMap[q.ma_du_an ?? -1] ?? "-"}</td>
+        <td style="padding:6px;border:1px solid #ddd">${q.ma_nguoi_dung?.ten ?? q.ma_nguoi_dung?.email ?? "-"}</td>
+        <td style="padding:6px;border:1px solid #ddd">${projectsMap[q?.ma_du_an?.id ?? -1] ?? "-"}</td>
         <td style="padding:6px;border:1px solid #ddd;text-align:right">${Number(q.so_tien).toLocaleString()} ${q.don_vi_tien_te ?? ""}</td>
         <td style="padding:6px;border:1px solid #ddd">${q.phuong_thuc_thanh_toan ?? "-"}</td>
-        <td style="padding:6px;border:1px solid #ddd">${q.trang_thai_thanh_toan ?? "-"}</td>
+        <td style="padding:6px;border:1px solid #ddd">${q?.trang_thai_ ?? "-"}</td>
         <td style="padding:6px;border:1px solid #ddd">${q.ngay_tao ? new Date(q.ngay_tao).toLocaleDateString("vi-VN") : "-"}</td>
       </tr>`).join("")
 
@@ -352,7 +356,7 @@ export default function AdminQuyenGopPage() {
                 <Button variant="secondary" className="text-sm" onClick={() => { resetFilters(); }}>
                   <XCircle className="h-4 w-4 mr-2" /> Xóa bộ lọc
                 </Button>
-     
+
               </div>
             </div>
           </CardHeader>
@@ -459,7 +463,7 @@ export default function AdminQuyenGopPage() {
                 <thead>
                   <tr className="text-left text-sm text-neutral-400 border-b border-neutral-700">
                     <th className="py-3 px-4">
-                      <input type="checkbox" onChange={toggleSelectAllVisible} checked={paginated.every(p => selectedIds.includes(p.id)) && paginated.length>0} />
+                      <input type="checkbox" onChange={toggleSelectAllVisible} checked={paginated.every(p => selectedIds.includes(p.id)) && paginated.length > 0} />
                     </th>
                     <th className="py-3 px-4">ID</th>
                     <th className="py-3 px-4">Người quyên góp</th>
@@ -481,11 +485,12 @@ export default function AdminQuyenGopPage() {
                       <tr key={q.id} className="border-b border-neutral-700 hover:bg-[#0b1220] text-sm">
                         <td className="py-3 px-4 text-center"><input type="checkbox" checked={selectedIds.includes(q.id)} onChange={() => toggleSelect(q.id)} /></td>
                         <td className="py-3 px-4">{q.id}</td>
-                        <td className="py-3 px-4">{q.ten_nguoi_quyen_gop ?? q.email_nguoi_quyen_gop}</td>
-                        <td className="py-3 px-4">{projectsMap[q.ma_du_an ?? -1] ?? "-"}</td>
+                        <td className="py-3 px-4">{q.ma_nguoi_dung?.ten ?? q.ma_nguoi_dung?.email}</td>
+                        <td className="py-3 px-4">{projectsMap[q?.ma_du_an?.id ?? -1] ?? "-"}</td>
                         <td className="py-3 px-4 text-right">{formatMoney(q.so_tien)} {q.don_vi_tien_te}</td>
                         <td className="py-3 px-4">{q.phuong_thuc_thanh_toan}</td>
-                        <td className="py-3 px-4">{renderStatusBadge(q.trang_thai_thanh_toan)}</td>
+
+                        <td className="py-3 px-4">{renderStatusBadge(q?.trang_thai_)}</td>
                         <td className="py-3 px-4">{q.ngay_tao ? new Date(q.ngay_tao).toLocaleString() : "-"}</td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
@@ -539,8 +544,8 @@ export default function AdminQuyenGopPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm mt-4">
                 <div>
                   <div className="text-xs text-neutral-400">Người quyên góp</div>
-                  <div className="font-medium text-white">{detail.ten_nguoi_quyen_gop || '-'}</div>
-                  <div className="text-xs text-neutral-400">{detail.email_nguoi_quyen_gop || '-'} • {detail.sdt_nguoi_quyen_gop || '-'}</div>
+                  <div className="font-medium text-white">{detail.ma_nguoi_dung?.ten || '-'}</div>
+                  <div className="text-xs text-neutral-400">{detail.ma_nguoi_dung?.email || '-'} • {detail?.ma_nguoi_dung?.so_dien_thoai || '-'}</div>
 
                   <div className="mt-4 text-xs text-neutral-400">Số tiền</div>
                   <div className="font-medium">{formatMoney(detail.so_tien)} {detail.don_vi_tien_te}</div>
@@ -549,14 +554,14 @@ export default function AdminQuyenGopPage() {
 
                 <div>
                   <div className="text-xs text-neutral-400">Dự án</div>
-                  <div className="font-medium">{projectsMap[detail.ma_du_an ?? -1] ?? detail.ma_du_an ?? '-'}</div>
+                  <div className="font-medium">{projectsMap[detail?.ma_du_an?.id ?? -1] ?? detail.ma_du_an ?? '-'}</div>
 
                   <div className="mt-4 text-xs text-neutral-400">Mã giao dịch</div>
                   <div className="font-medium">{detail.ma_giao_dich || '-'}</div>
 
                   <div className="mt-4 text-xs text-neutral-400">Phương thức</div>
                   <div className="font-medium">{detail.phuong_thuc_thanh_toan || '-'}</div>
-                  <div className="mt-1">{renderStatusBadge(detail.trang_thai_thanh_toan)}</div>
+                  <div className="mt-1">{renderStatusBadge(detail?.trang_thai_)}</div>
 
                   {detail.duong_dan_bien_lai && (
                     <div className="mt-3">

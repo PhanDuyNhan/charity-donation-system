@@ -25,18 +25,17 @@ export default function DangNhapPage() {
     setLoading(true)
 
     try {
-      const { user } = await authService.login(email, password)
-      console.log("userrrrrrrrrrrrr", user.role)
+      const  {user}  = await authService.login(email, password)
+      console.log("userrrrrrrrr", user)
       // Redirect based on role
-      console.log("notttttttttttttttttttttttttt")
       if (isAdmin(user)) {
-        console.log("2222222222222222222222222222222")
         router.push("/admin")
       } else {
         router.push("/")
       }
     } catch (err: any) {
-      setError(err.message || "Email hoặc mật khẩu không đúng. Vui lòng thử lại.")
+      // setError(err.message)
+      setError(JSON.parse(err.message).message)
     } finally {
       setLoading(false)
     }
