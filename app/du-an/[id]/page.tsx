@@ -50,6 +50,7 @@ export default function ProjectDetailPage() {
   const [blockchainDonations, setBlockchainDonations] = useState<FormattedBlockchainDonation[]>([])
   const [blockchainLoading, setBlockchainLoading] = useState(false)
   const [blockchainError, setBlockchainError] = useState<string | null>(null)
+  const [blockchainFetched, setBlockchainFetched] = useState(false) // Track if blockchain data was already fetched
 
   // Gallery state
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -90,7 +91,8 @@ export default function ProjectDetailPage() {
 
   // Load blockchain data when switching to blockchain tab
   useEffect(() => {
-    if (activeTab === "blockchain" && project && blockchainDonations.length === 0 && !blockchainLoading) {
+    // Chỉ fetch nếu: tab blockchain đang active, có project, chưa fetch và không đang loading
+    if (activeTab === "blockchain" && project && !blockchainFetched && !blockchainLoading) {
       const loadBlockchainData = async () => {
         setBlockchainLoading(true)
         setBlockchainError(null)
@@ -103,11 +105,12 @@ export default function ProjectDetailPage() {
           setBlockchainError("Không thể tải dữ liệu từ blockchain")
         } finally {
           setBlockchainLoading(false)
+          setBlockchainFetched(true) // Đánh dấu đã fetch xong (dù thành công hay thất bại)
         }
       }
       loadBlockchainData()
     }
-  }, [activeTab, project, blockchainDonations.length, blockchainLoading])
+  }, [activeTab, project, blockchainFetched, blockchainLoading])
 
   if (loading)
     return (
@@ -462,6 +465,7 @@ export default function ProjectDetailPage() {
                         onClick={() => {
                           setBlockchainDonations([])
                           setBlockchainError(null)
+                          setBlockchainFetched(false) // Reset để có thể fetch lại
                         }}
                         style={{
                           marginTop: '12px',
