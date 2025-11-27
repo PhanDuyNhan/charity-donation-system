@@ -83,52 +83,21 @@ export interface QuyenGop {
 export interface SuKien {
   id: number
   tieu_de: string
-  duong_dan: string
   mo_ta: string
-  mo_ta_ngan?: string
   thoi_gian_bat_dau: string
   thoi_gian_ket_thuc?: string
   dia_diem: string
-  dia_chi_chi_tiet?: string
-  vi_do?: number
-  kinh_do?: number
-  so_nguoi_toi_da?: number
-  so_nguoi_hien_tai: number
-  han_dang_ky?: string
-  trang_thai: TrangThaiSuKien
-  loai_su_kien: LoaiSuKien
-  phi_tham_gia: number
-  anh_dai_dien?: string
-  thu_vien_anh?: any
-  nguoi_lien_he?: string
-  sdt_lien_he?: string
-  email_lien_he?: string
-  yeu_cau_tham_gia?: string
-  quyen_loi?: string
   nguoi_tao: number
   ngay_tao: string
-  ngay_cap_nhat: string
 }
 
 export interface TinTuc {
   id: number
   tieu_de: string
- // duong_dan: string
   noi_dung: string
-  //tom_tat?: string
-  //chuyen_muc: ChuyenMucTinTuc
   ma_tac_gia: number
-  //trang_thai: TrangThaiNoiDung
   anh_dai_dien?: string
-  //thu_vien_anh?: any
-  //the_tag?: any
-  //luot_xem: number
-  //la_bai_noi_bat: boolean
-  //tieu_de_seo?: string
-  //mo_ta_seo?: string
-  //ngay_xuat_ban?: string
   ngay_tao: string
-  //ngay_cap_nhat: string
 }
 
 export interface TinhNguyenVien {
