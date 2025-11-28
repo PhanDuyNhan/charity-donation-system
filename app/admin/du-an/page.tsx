@@ -581,7 +581,7 @@ export default function AdminDuAnPage() {
                               (d?.giai_ngan?.reduce((sum, item) => sum + (item.so_tien || 0), 0) || 0)
                             ).toLocaleString()
                           ) : 
-                            Number(d?.so_tien_hien_tai).toLocaleString()
+                            0
                           }
                         </td>
 
