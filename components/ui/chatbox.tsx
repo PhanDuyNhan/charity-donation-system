@@ -32,7 +32,7 @@ const ChatbotWidget = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('https://tdnek123.app.n8n.cloud/webhook/30348004-6ccc-4841-83d1-bff635bde46b', {
+      const response = await fetch('https://gregeg.app.n8n.cloud/webhook/30348004-6ccc-4841-83d1-bff635bde46b', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
