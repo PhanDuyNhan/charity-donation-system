@@ -149,6 +149,15 @@ export default function AdminDuAnPage() {
     return found ? found.ten : "—"
   }
 
+  // Kiểm tra dự án đã hết hạn chưa
+  function isProjectExpired(d: DuAn): boolean {
+    if (!d.ngay_ket_thuc) return false
+    const endDate = new Date(d.ngay_ket_thuc)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return endDate < today
+  }
+
   // Filtered list
   const filtered = duAns
     .filter((d) => {
@@ -158,7 +167,13 @@ export default function AdminDuAnPage() {
       return query.split(" ").every((word) => text.includes(word))
     })
     .filter((d) => (categoryId ? Number(d.ma_danh_muc) === categoryId : true))
-    .filter((d) => (statusFilter ? String(d.trang_thai) === statusFilter : true))
+    .filter((d) => {
+      if (!statusFilter) return true
+      // Nếu lọc "da_ket_thuc" thì check ngày hết hạn
+      if (statusFilter === "da_ket_thuc") return isProjectExpired(d)
+      // Các trạng thái khác thì check trang_thai và không phải hết hạn
+      return String(d.trang_thai) === statusFilter && !isProjectExpired(d)
+    })
     .filter((d) => {
       if (!startDate && !endDate) return true
       const start = d.ngay_bat_dau ? new Date(d.ngay_bat_dau) : null
@@ -451,6 +466,7 @@ export default function AdminDuAnPage() {
                   <SelectItem value="tam_dung">Tạm dừng</SelectItem>
                   <SelectItem value="ban_nhap">Bản nháp</SelectItem>
                   <SelectItem value="hoan_thanh">Hoàn thành</SelectItem>
+                  <SelectItem value="da_ket_thuc">Đã kết thúc</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -586,15 +602,21 @@ export default function AdminDuAnPage() {
                         </td>
 
                         <td className="py-3 px-6">
-                          <span className={`inline-block px-2 py-0.5 text-[8px] uppercase font-semibold rounded-full 
-        whitespace-nowrap {/* <--- THÊM CLASS NÀY */}
-        ${d.trang_thai === "hoat_dong" ? "bg-green-700 text-green-50"
-                              : d.trang_thai === "hoan_thanh" ? "bg-neutral-600 text-neutral-50"
-                                : d.trang_thai === "tam_dung" ? "bg-yellow-600 text-neutral-900"
-                                  : "bg-neutral-700 text-neutral-300"}`}
-                          >
-                            {d.trang_thai ? d.trang_thai.replace('_', ' ') : "—"}
-                          </span>
+                          {(() => {
+                            const expired = isProjectExpired(d)
+                            const status = expired ? "da_ket_thuc" : d.trang_thai
+                            const statusClass = expired ? "bg-red-700 text-red-50"
+                              : status === "hoat_dong" ? "bg-green-700 text-green-50"
+                              : status === "hoan_thanh" ? "bg-neutral-600 text-neutral-50"
+                              : status === "tam_dung" ? "bg-yellow-600 text-neutral-900"
+                              : "bg-neutral-700 text-neutral-300"
+                            const statusText = expired ? "Đã kết thúc" : (status ? status.replace('_', ' ') : "—")
+                            return (
+                              <span className={`inline-block px-2 py-0.5 text-[8px] uppercase font-semibold rounded-full whitespace-nowrap ${statusClass}`}>
+                                {statusText}
+                              </span>
+                            )
+                          })()}
                         </td>
 
                         {/* DropdownMenu for actions */}
